@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import warnings
+import warnings, re
 warnings.filterwarnings("ignore")
 
 from itertools import cycle
@@ -12,21 +12,35 @@ import streamlit as st
 st.set_page_config(page_title="배터리 시세 대시보드", layout="wide")
 st.title("배터리/제품 월별 시세 분석 & 예측")
 
-# CSV 업로드(또는 기본 경로)
+# ====== 1) CSV 로드 ======
 uploaded = st.sidebar.file_uploader(
     "CSV 업로드(계약일·배터리종류·제품구분·개당가격 포함)", type=["csv"]
 )
 if uploaded is not None:
-    df = pd.read_csv(uploaded, parse_dates=["계약일"])
+    df = pd.read_csv(uploaded)
 else:
-    df = pd.read_csv("data/통합거래내역.csv", parse_dates=["계약일"])
+    df = pd.read_csv("data/통합거래내역.csv")
 
-# ====== 1) 사이드바 입력 ======
-#   * CSV 실제 헤더에 공백이 없으므로 '배터리종류', '제품구분'으로 설정
+# 🔸 1-A. 컬럼 이름 양쪽 공백 제거
+df.columns = df.columns.str.strip()
+
+# 🔸 1-B. 날짜 컬럼을 datetime으로 변환
+df["계약일"] = pd.to_datetime(df["계약일"], errors="coerce")
+df = df.dropna(subset=["계약일"])            # 날짜 변환 실패 행 제거
+
+# 🔸 1-C. 개당가격을 순수 숫자로 변환(콤마·원 단위 제거)
+df["개당가격"] = (
+    df["개당가격"]
+      .astype(str)
+      .str.replace(r"[^\d.\-]", "", regex=True)   # 숫자·마이너스·점만 남김
+      .replace("", pd.NA)
+      .astype(float)
+)
+
+# ====== 2) 사이드바 설정 ======
 col_type = st.sidebar.radio("분류 컬럼 선택", ["배터리종류", "제품구분"])
 forecast_horizon = st.sidebar.number_input("예측 개월 수", 6, 36, 12)
 
-# ====== 2) 팔레트 ======
 palette = cycle(
     ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 )
@@ -44,14 +58,13 @@ def make_stats_and_forecast(df, category_col, horizon):
             continue
 
         monthly_stats = (
-            dfg.set_index("계약일")["개당가격"]        # ← 공백 없는 '개당가격'
+            dfg.set_index("계약일")["개당가격"]
                .resample("M")
                .agg(["min", "max", "mean"])
                .dropna()
         )
         monthly_stats_dict[g] = monthly_stats
 
-        # 24개월 이상이면 예측
         if len(monthly_stats) >= 24:
             model = ExponentialSmoothing(
                 monthly_stats["mean"],
