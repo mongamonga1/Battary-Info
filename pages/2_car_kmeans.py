@@ -1,209 +1,95 @@
 # -*- coding: utf-8 -*-
-"""Car_kmeans"""
+"""차명별 K-means 군집 분석"""
+import warnings, re
+warnings.filterwarnings("ignore")
 
-import numpy as np
+import streamlit as st
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib as mpl
 import seaborn as sns
 
+from pathlib import Path
+from math import pi
+from itertools import cycle
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from scipy.cluster.hierarchy import linkage, dendrogram
-from math import pi
 
-# Optional Yellowbrick elbow visualizer
-try:
-    from yellowbrick.cluster import KElbowVisualizer
-    use_yb = True
-except ImportError:
-    use_yb = False
+# ─────────────────────────── 설정 ───────────────────────────
+st.header("🚗 차명별 K-means 군집 분석")
 
-# ─── Font settings (English-only) ───────────────────────────────
-mpl.rcParams['font.family'] = 'DejaVu Sans'
-mpl.rcParams['axes.unicode_minus'] = False
+# 1) 데이터 불러오기
+DATA_PATH = Path("data/SoH_NCM_Dataset_selected.xlsx")
+uploaded  = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
 
-# ─── Load and preprocess data ───────────────────────────────────
-file_path = '/content/drive/MyDrive/Big_Project/SoH_NCM_Dataset_selected_배터리등급열추가.xlsx'
-df = pd.read_excel(file_path)
+if uploaded:
+    df = pd.read_excel(uploaded, engine="openpyxl")
+    st.success("업로드한 파일을 사용합니다.")
+elif DATA_PATH.exists():
+    df = pd.read_excel(DATA_PATH, engine="openpyxl")
+else:
+    st.error("기본 엑셀 파일(data/SoH_NCM_Dataset_selected.xlsx)을 찾을 수 없습니다. "
+             "사이드바에서 파일을 업로드해 주세요.")
+    st.stop()
 
-# Rename columns & translate categories
+# 2) 전처리
+df.columns = df.columns.str.strip()
 df.rename(columns={
-    '사용연수(t)': 'Age',
-    'SoH_pred(%)': 'SoH',
-    '중고거래가격': 'Price',
-    '셀 간 균형': 'CellBalance'
+    "사용연수(t)": "Age",
+    "SoH_pred(%)": "SoH",
+    "중고거래가격": "Price",
+    "셀 간 균형": "CellBalance",
 }, inplace=True)
-df['CellBalance'] = df['CellBalance'].map({
-    '우수': 'Good',
-    '경고': 'Warning',
-    '심각': 'Critical'
-})
+df["CellBalance"] = df["CellBalance"].map(
+    {"우수": "Good", "경고": "Warning", "심각": "Critical"}
+)
 
-# ─── Define features & model list ───────────────────────────────
-num_cols = ['Age', 'SoH', 'Price']
-cat_col = 'CellBalance'
-model_map = {
-    'EV6':'EV6','G80':'G80','니로 EV':'Niro EV','봉고Ⅲ':'Bongo III',
-    '쏘울 EV':'Soul EV','아이오닉5':'Ioniq 5',
-    '코나 일렉트릭 (KONA ELECTRIC)':'Kona Electric','포터Ⅱ':'Porter II'
-}
+num_cols = ["Age", "SoH", "Price"]
+cat_col  = "CellBalance"
 
-# ─── Preprocessor setup ─────────────────────────────────────────
-preprocessor = ColumnTransformer([
-    ('num', StandardScaler(), num_cols),
-    ('cat', OneHotEncoder(drop='first'), [cat_col])
-])
+preproc = ColumnTransformer(
+    [("num", StandardScaler(), num_cols),
+     ("cat", OneHotEncoder(drop="first"), [cat_col])]
+)
 
-# ─── Loop each model ────────────────────────────────────────────
-for hangul_model, eng_model in model_map.items():
-    print(f"\n{'='*50}\nModel: {eng_model}\n{'='*50}")
-    sub = df[df['차명'] == hangul_model].copy()
-    n = len(sub)
-    if n < 3:
-        print(f"Skipping {eng_model}: only {n} samples")
-        continue
+model_list = sorted(df["차명"].dropna().unique())
+choice = st.sidebar.selectbox("차명 선택", model_list)
 
-    # Preprocess features
-    X = preprocessor.fit_transform(sub)
-    if hasattr(X, 'toarray'): X = X.toarray()
+# 3) K-means 실행
+sub = df[df["차명"] == choice].copy()
+if len(sub) < 3:
+    st.warning(f"{choice} 샘플이 {len(sub)}건으로 분석할 수 없습니다.")
+    st.stop()
 
-    # Candidate k values
-    ks = list(range(2, min(10, n)))
+X = preproc.fit_transform(sub)
+if hasattr(X, "toarray"):
+    X = X.toarray()
 
-    # 1) Silhouette method
-    sil_scores = [
-        silhouette_score(X, KMeans(n_clusters=k, random_state=42).fit_predict(X))
-        for k in ks
-    ]
-    k_sil = ks[np.argmax(sil_scores)]
-    plt.figure(figsize=(5,3))
-    plt.plot(ks, sil_scores, '-o')
-    plt.title(f"{eng_model}: Silhouette Scores")
-    plt.xlabel("k"); plt.ylabel("Avg Silhouette")
-    plt.tight_layout(); plt.show()
+ks = range(2, min(10, len(sub)))
+sil_scores = [
+    silhouette_score(X, KMeans(n_clusters=k, random_state=42).fit_predict(X))
+    for k in ks
+]
+opt_k = ks[int(np.argmax(sil_scores))]
 
-    # 2) Elbow (inertia)
-    inertias = [KMeans(n_clusters=k, random_state=42).fit(X).inertia_ for k in ks]
-    k_elbow = ks[np.argmax(np.diff(inertias)) + 1]
-    plt.figure(figsize=(5,3))
-    plt.plot(ks, inertias, '-o')
-    plt.title(f"{eng_model}: Elbow Plot (Inertia)")
-    plt.xlabel("k"); plt.ylabel("Inertia")
-    plt.tight_layout(); plt.show()
+labels = KMeans(n_clusters=opt_k, random_state=42).fit_predict(X)
+sub["cluster"] = labels
+palette = cycle(sns.color_palette("tab10"))
 
-    # 3) Yellowbrick elbow (optional)
-    if use_yb:
-        viz = KElbowVisualizer(KMeans(random_state=42), k=ks, metric='silhouette')
-        viz.fit(X); viz.show()
-        print(f"Yellowbrick Optimal k: {viz.elbow_value_}")
+# 4) 시각화 예시 ─ Boxplot
+for col in num_cols:
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.boxplot(x="cluster", y=col, data=sub, palette="tab10", ax=ax)
+    ax.set_title(f"{choice}: {col} by Cluster (k={opt_k})")
+    st.pyplot(fig)
 
-    # 4) Dendrogram gap method
-    X_sub = X if n <= 200 else X[np.random.choice(n, 200, replace=False)]
-    Z = linkage(X_sub, method='ward')
-    plt.figure(figsize=(5,3))
-    dendrogram(Z, truncate_mode='lastp', p=10, show_leaf_counts=True)
-    plt.title(f"{eng_model}: Dendrogram")
-    plt.tight_layout(); plt.show()
-    dists = Z[:,2]
-    gaps = np.diff(dists)
-    k_dend = max(2, min(n - (np.argmax(gaps)+1), ks[-1]))
-
-    # Final k as median
-    k_final = int(np.median([k_sil, k_elbow, k_dend]))
-    print(f"Optimal k: {k_final} (Sil={k_sil}, Elbow={k_elbow}, Dend={k_dend})\n")
-
-    # 5) KMeans clustering
-    labels = KMeans(n_clusters=k_final, random_state=42).fit_predict(X)
-    sub['cluster'] = labels
-    clusters = sorted(sub['cluster'].unique())
-
-    # ─── Per-variable profiling ─────────────────────────────────
-    # Numeric: boxplot + violin
-    for var in num_cols:
-        plt.figure(figsize=(6,4))
-        ax = sns.boxplot(x='cluster', y=var, data=sub,
-                         hue='cluster', palette='tab10', dodge=False)
-        ax.legend_.remove()
-        plt.title(f"{eng_model}: Boxplot of {var} by Cluster")
-        plt.tight_layout(); plt.show()
-
-        plt.figure(figsize=(6,4))
-        ax2 = sns.violinplot(x='cluster', y=var, data=sub,
-                             hue='cluster', palette='tab10',
-                             dodge=False, inner='quartile')
-        ax2.legend_.remove()
-        plt.title(f"{eng_model}: Violin Plot of {var} by Cluster")
-        plt.tight_layout(); plt.show()
-
-    # Categorical: countplot + stacked bar
-    plt.figure(figsize=(6,4))
-    sns.countplot(x='cluster', hue=cat_col, data=sub, palette='Set2')
-    plt.title(f"{eng_model}: Count of {cat_col} by Cluster")
-    plt.tight_layout(); plt.show()
-
-    ctab_pct = pd.crosstab(sub['cluster'], sub[cat_col], normalize='index')*100
-    ctab_pct = ctab_pct.reindex(clusters, fill_value=0)
-    ctab_pct.plot(kind='bar', stacked=True, figsize=(6,4), colormap='Paired')
-    plt.title(f"{eng_model}: {cat_col} Distribution (%) by Cluster")
-    plt.tight_layout(); plt.show()
-
-    # ─── Combined profiling ────────────────────────────────────
-    mean_matrix = sub.groupby('cluster')[num_cols].mean()
-    plt.figure(figsize=(6,4))
-    sns.heatmap(mean_matrix, annot=True, cmap='coolwarm')
-    plt.title(f"{eng_model}: Numeric Feature Means per Cluster")
-    plt.tight_layout(); plt.show()
-
-    norm_means = mean_matrix.copy()
-    for col in num_cols:
-        mn, mx = df[col].min(), df[col].max()
-        norm_means[col] = (norm_means[col] - mn) / (mx - mn)
-    angles = [i/len(num_cols)*2*pi for i in range(len(num_cols))] + [0]
-    plt.figure(figsize=(6,6))
-    for i in clusters:
-        vals = norm_means.loc[i].tolist() + [norm_means.loc[i].tolist()[0]]
-        plt.polar(angles, vals, label=f"Cluster {i}")
-        plt.fill(angles, vals, alpha=0.1)
-    plt.xticks(angles[:-1], num_cols)
-    plt.title(f"{eng_model}: Radar Chart of Cluster Profiles")
-    plt.tight_layout(); plt.show()
-
-    # ─── Dimensionality reductions ─────────────────────────────
-    pca2 = PCA(2, random_state=42).fit_transform(X)
-    plt.figure(figsize=(5,4))
-    plt.scatter(pca2[:,0], pca2[:,1], c=labels, cmap='tab10',
-                s=50, edgecolors='k', alpha=0.8)
-    plt.title(f"{eng_model}: PCA 2D (k={k_final})")
-    plt.tight_layout(); plt.show()
-
-    ts2 = TSNE(n_components=2, perplexity=min(30,n-1),
-               max_iter=500, random_state=42, init='pca').fit_transform(X)
-    plt.figure(figsize=(5,4))
-    plt.scatter(ts2[:,0], ts2[:,1], c=labels, cmap='tab10',
-                s=50, edgecolors='k', alpha=0.8)
-    plt.title(f"{eng_model}: t-SNE 2D (k={k_final})")
-    plt.tight_layout(); plt.show()
-
-    # ─── Cluster statistics summary ─────────────────────────────
-    stats = sub.groupby('cluster')[num_cols].agg(['count','mean','std','min','max','median'])
-    print(f"{eng_model} - Cluster Statistics:")
-    print(stats, "\n")
-
-    # ─── Textual insights ───────────────────────────────────────
-    print(f"{eng_model} - Textual Insights Summary:")
-    cluster_pct = sub['cluster'].value_counts(normalize=True).reindex(clusters, fill_value=0)*100
-    means = sub.groupby('cluster')[num_cols].mean().reindex(clusters)
-    for i in clusters:
-        dom = ctab_pct.loc[i].idxmax()
-        print(
-            f" Cluster {i}: {cluster_pct[i]:.1f}% samples, "
-            f"avg Age {means.loc[i,'Age']:.2f} yr, "
-            f"avg SoH {means.loc[i,'SoH']:.1f}%, "
-            f"avg Price {means.loc[i,'Price']:.0f} KRW, "
-            f"dominant {cat_col} '{dom}' ({ctab_pct.loc[i].max():.1f}%)."
-        )
+# 5) 2D PCA 시각화
+pca2 = PCA(2, random_state=42).fit_transform(X)
+fig, ax = plt.subplots(figsize=(5, 4))
+ax.scatter(pca2[:, 0], pca2[:, 1], c=labels, cmap="tab10", s=60, edgecolors="k")
+ax.set_title(f"{choice}: PCA 2-D (k={opt_k})")
+st.pyplot(fig)
