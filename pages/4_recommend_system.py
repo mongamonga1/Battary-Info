@@ -13,9 +13,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 # ------------------------------------------------------------------
 # 1) 데이터 불러오기
 # ------------------------------------------------------------------
-TX_PATH = "/content/통합거래내역.csv"
-MARKET_PATH = "/content/매물리스트.csv"
-EVAL_PATH = "/content/업체평가정보.csv"
+TX_PATH = "data/통합거래내역.csv"
+MARKET_PATH = "data/매물리스트.csv"
+EVAL_PATH = "data/업체평가정보.csv"
 
 transactions = pd.read_csv(TX_PATH)
 market = pd.read_csv(MARKET_PATH)
