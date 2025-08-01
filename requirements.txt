@@ -8,3 +8,4 @@ seaborn
 openpyxl
 joblib
 torch          # LSTM 쓰지 않으면 지워도 됨
+statsmodels
