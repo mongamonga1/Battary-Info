@@ -23,8 +23,6 @@ try:
 except Exception:
     TORCH_AVAILABLE = False
 
-from google.colab import files
-
 # -----------------------------
 # 1) 설정값
 # -----------------------------
