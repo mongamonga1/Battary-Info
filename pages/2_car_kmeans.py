@@ -23,7 +23,7 @@ from sklearn.manifold import TSNE
 st.header("🚗 차명별 K-means 군집 분석")
 
 # 1) 데이터 불러오기
-DATA_PATH = Path("data/SoH_NCM_Dataset_selected.xlsx")
+DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
 uploaded  = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
 
 if uploaded:
