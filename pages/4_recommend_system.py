@@ -115,6 +115,7 @@ filtered_market = filtered_market.sort_values(
 columns = ["판매업체", "제품구분", "배터리종류", "계약수량(단위당)", "총평가점수"]
 result = filtered_market.head(10)[columns].reset_index(drop=True)
 
-# 표 형태 출력
-print("\n📊 성일하이텍(주)를 위한 추천 매물 Top 10 (표 형식)\n")
-print(result.to_markdown(index=False))
+import streamlit as st
+
+st.subheader("📊 성일하이텍(주)를 위한 추천 매물 Top 10")
+st.dataframe(result, use_container_width=True)   # 또는 st.table(result)
