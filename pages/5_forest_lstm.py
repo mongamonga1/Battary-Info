@@ -287,9 +287,10 @@ def combine_scores(a, b):
 
 df_feat["final_score"] = [combine_scores(a, b) for a, b in zip(df_feat["if_score_norm"], df_feat["lstm_score_norm"])]
 
-# ----------------------------- 10) Plotly 시각화 -----------------------------
+import streamlit as st
 import plotly.express as px
 
+# ───────────────────── 10) Plotly 시각화 ─────────────────────
 threshold = df_feat["final_score"].quantile(1 - CONTAMINATION)
 df_feat["anomaly"] = df_feat["final_score"] >= threshold
 
@@ -306,10 +307,16 @@ fig_anom = px.scatter(
     }
 )
 fig_anom.update_traces(marker=dict(size=8))
-fig_anom.show()
 
-# ----------------------------- 11) 이상치 리스트 출력 -----------------------------
+# Streamlit에 Plotly 차트로 표시
+st.subheader("🔍 이상치 스코어 산점도")
+st.plotly_chart(fig_anom, use_container_width=True)
+
+
+# ───────────────────── 11) 이상치 리스트 출력 ─────────────────────
 anom_df = df_feat[df_feat["final_score"] >= threshold]
 cols = ["계약번호", "계약일", "판매업체", "구매업체", "제품구분", "배터리종류", "final_score"]
-print(f"\n▶ Top {int(CONTAMINATION*100)}% Anomalies ({len(anom_df)}건):\n")
-print(anom_df[cols].sort_values("final_score", ascending=False).to_string(index=False))
+top_anom = anom_df[cols].sort_values("final_score", ascending=False)
+
+st.subheader(f"🚨 Top {int(CONTAMINATION*100)}% 이상치 리스트 ({len(top_anom)}건)")
+st.dataframe(top_anom, use_container_width=True)
