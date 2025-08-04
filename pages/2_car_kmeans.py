@@ -44,21 +44,34 @@ apply_colors(
 )
 st.markdown("""
 <style>
-/* 3) 드롭존 내부 텍스트를 밝게(항상 보이게) — 버튼은 제외 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *:not(button):not([role="button"]):not([data-baseweb="button"]):not(button *):not([role="button"] *):not([data-baseweb="button"] *),
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *:not(button):not([role="button"]):not([data-baseweb="button"]):not(button *):not([role="button"] *):not([data-baseweb="button"] *){
+/* (1) 드롭존 박스 */
+section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"]{
+  background-color:#1E293B !important;
+  border:1.5px dashed #94A3B8 !important;
+  border-radius:12px !important;
+}
+
+/* (2) 호환용(기존 클래스 경로) */
+section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"],
+section[data-testid="stSidebar"] .stFileUploader > div > div{
+  background-color:#1E293B !important;
+  border:1.5px dashed #94A3B8 !important;
+  border-radius:12px !important;
+}
+
+/* (3) 드롭존 내부 안내문 텍스트만 밝게 — '버튼'은 제외 */
+section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *),
+section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *){
   color:#EAF2FF !important;
   opacity:1 !important;
   filter:none !important;
 }
 
-/* 4) 업로더 '버튼'(및 내부 라벨) 색상 강제 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button,
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [role="button"],
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"],
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button *,
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [role="button"] *,
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"] *{
+/* (4) 업로더의 ‘Browse files’ 버튼(및 라벨)만 진하게 */
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] button,
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"],
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] button *,
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"] *{
   background-color:#F1F5F9 !important;
   color:#0F172A !important;
   font-weight:700 !important;
