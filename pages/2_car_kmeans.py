@@ -44,19 +44,16 @@ apply_colors(
 )
 st.markdown("""
 <style>
-  /* 사이드바 안에서 '흰 배경'을 쓰는 위젯들의 텍스트 색 강화 */
-  section[data-testid="stSidebar"] input,
-  section[data-testid="stSidebar"] textarea,
-  section[data-testid="stSidebar"] [data-baseweb="select"] *,
-  section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
-  section[data-testid="stSidebar"] .stDownloadButton > button span {
-    color: #111827 !important;   /* 아주 진한 회색(검정에 가까움) */
-  }
-
-  /* 플레이스홀더(연한 글자)도 조금 진하게 */
-  section[data-testid="stSidebar"] ::placeholder {
-    color: #374151 !important;   /* slate-700 */
+  /* ⛳ 파일 업로더(흰 배경) 안의 모든 텍스트를 진한 색으로 강제 */
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"],
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] *,
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] span,
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] p,
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] small,
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] label {
+    color: #0F172A !important;   /* 아주 진한 남색 = 거의 검정 */
     opacity: 1 !important;
+    filter: none !important;
   }
 </style>
 """, unsafe_allow_html=True)
