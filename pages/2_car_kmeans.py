@@ -56,7 +56,6 @@ if uploaded:
     st.success("업로드한 파일을 사용합니다.")
 elif DATA_PATH.exists():
     df_raw = load_excel(DATA_PATH)
-    st.info(f"기본 엑셀 사용: {DATA_PATH}")
 else:
     st.error("기본 엑셀 파일을 찾을 수 없습니다. 사이드바에서 업로드해 주세요.")
     st.stop()
