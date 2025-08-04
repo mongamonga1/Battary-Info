@@ -15,6 +15,21 @@ from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 
+import streamlit as st
+from pathlib import Path
+
+# (선택) 경로 존재 가드 – 오타/실행 루트 문제 조기 탐지
+assert Path("pages/2_car_kmeans.py").exists(), "pages/2_car_kmeans.py 없음"
+assert Path("pages/4_recommend_system.py").exists(), "pages/4_recommend_system.py 없음"
+assert Path("pages/5_forest_lstm.py").exists(), "pages/5_forest_lstm.py 없음"
+assert Path("pages/5_timeseries_analysis.py").exists(), "pages/5_timeseries_analysis.py 없음"
+
+# 문자열 경로 대신 Page 객체 생성 (방법B에서도 사용 가능)
+pg_kmeans = st.Page("pages/2_car_kmeans.py",          title="🚗 차명별 군집분석")
+pg_reco   = st.Page("pages/4_recommend_system.py",    title="✨ 기업 추천")
+pg_fraud  = st.Page("pages/5_forest_lstm.py",         title="🌳 이상거래 의심")
+pg_ts     = st.Page("pages/5_timeseries_analysis.py", title="📈 시세 분석")
+
 # ───────────────────── 페이지 기본 설정 ─────────────────────
 st.set_page_config(
     page_title="배터리 데이터 분석 허브",
@@ -187,11 +202,11 @@ with st.sidebar:
 
 with st.sidebar:
     st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
-    # ⚠️ 실제 파일명으로 경로를 맞추세요. 예: 'pages/01_car kmeans.py'
-    st.page_link("pages/2_car_kmeans.py",           label="군집 분석",          icon="🚗")
-    st.page_link("pages/4_recommend_system.py",     label="기업 추천",    icon="✨")
-    st.page_link("pages/5_forest_lstm.py",          label="이상거래 의심",         icon="🌳")
-    st.page_link("pages/5_timeseries_analysis.py",  label="시세 분석", icon="📈")
+    st.page_link(pg_kmeans, label="군집 분석",     icon="🚗")
+    st.page_link(pg_reco,   label="기업 추천",     icon="✨")
+    st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
+    st.page_link(pg_ts,     label="시세 분석",     icon="📈")
+
 
 # ───────────────────── 데이터 유무 방어 ─────────────────────
 if df is None or ("계약일" not in df.columns):
