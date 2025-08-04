@@ -77,14 +77,11 @@ section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"] *
   font-weight:700 !important;
   opacity:1 !important;
 }
-/* (옵션) 호버/포커스 상태 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover{
-  background-color:#E2E8F0 !important;
+/* 사이드바 selectbox(입력창) 텍스트만 검정 */
+section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *{
+  color:#0F172A !important;
 }
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:focus{
-  outline:2px solid #93C5FD !important;
-  outline-offset:2px !important;
-}
+
 /* (옵션) 펼쳐진 옵션 목록 텍스트도 검정 */
 div[data-baseweb="popover"] [data-baseweb="menu"] *{
   color:#0F172A !important;
