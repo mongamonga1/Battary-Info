@@ -25,6 +25,17 @@ st.set_page_config(
 )
 
 # ───────────────────── 공통 스타일(CSS) ─────────────────────
+with st.sidebar:
+    st.header("🗂 메뉴")
+    st.caption("아래 페이지에서 상세 분석을 확인하세요.")
+    st.markdown("- car kmeans  \n- recommend system  \n- forest lstm  \n- timeseries analysis")
+    st.divider()
+    up = st.file_uploader("CSV 업로드(미리보기용)", type="csv")
+    if up:
+        tmp_df = pd.read_csv(up, nrows=100)
+        st.success("업로드 파일 미리보기 (100행)")
+        st.dataframe(tmp_df, use_container_width=True)
+        
 st.markdown(
     """
     <style>
