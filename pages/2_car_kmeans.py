@@ -44,17 +44,37 @@ apply_colors(
 )
 st.markdown("""
 <style>
-  /* 사이드바 파일 업로더: 배경만 어둡게 바꿔서 기존 흰 글자가 보이도록 */
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"]{
-    background: #1E293B;      /* slate-800 계열 */
-    border: 1.5px dashed #94A3B8;
-    border-radius: 12px;
-  }
-  /* 안내문/보조문구 약간 더 선명하게 */
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] p,
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] small{
-    opacity: 0.95;            /* 강제 색상 변경 없이 가독성만 보강 */
-  }
+/* ── 사이드바 파일 업로더 드롭존만 타겟(버전별 DOM 모두 커버) ───────── */
+
+/* 1) 가장 안정적인 data-testid 기준 */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]{
+  background-color: #1E293B !important;   /* 어두운 배경 */
+  border: 1.5px dashed #94A3B8 !important;
+  border-radius: 12px !important;
+}
+
+/* 2) base 클래스 기준 (일부 버전 호환용) */
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"],
+section[data-testid="stSidebar"] .stFileUploader > div > div{
+  background-color: #1E293B !important;
+  border: 1.5px dashed #94A3B8 !important;
+  border-radius: 12px !important;
+}
+
+/* 3) 드롭존 내부 텍스트를 밝게(항상 보이게) */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *{
+  color: #EAF2FF !important;    /* 거의 흰색 */
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+/* 4) 'Browse files' 버튼은 가독성 유지(밝은 버튼 + 진한 글자) */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button{
+  background-color: #F1F5F9 !important;  /* 밝은 회색 */
+  color: #0F172A !important;             /* 진한 글자 */
+  font-weight: 700 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
