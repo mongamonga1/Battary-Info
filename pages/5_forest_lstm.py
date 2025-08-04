@@ -17,7 +17,72 @@ try:
     TORCH_AVAILABLE = True
 except Exception:
     TORCH_AVAILABLE = False
+# ── 경량 테마(색상) ──────────────────────────────────────────────
+def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF", sidebar_link="#93C5FD"):
+    st.markdown(f"""
+    <style>
+      .stApp {{ background: {page_bg}; }}
+      section[data-testid="stSidebar"] {{ background: {sidebar_bg}; }}
+      section[data-testid="stSidebar"] * {{ color: {sidebar_text} !important; }}
+      section[data-testid="stSidebar"] a, section[data-testid="stSidebar"] svg {{
+        color: {sidebar_link} !important; fill: {sidebar_link} !important;
+      }}
+      section[data-testid="stSidebar"] a:hover {{ background-color: rgba(255,255,255,0.08) !important; border-radius: 8px; }}
+    </style>
+    """, unsafe_allow_html=True)
 
+apply_colors(
+    page_bg="#F5F7FB",
+    sidebar_bg="#0F172A",
+    sidebar_text="#FFFFFF",
+    sidebar_link="#93C5FD"
+)
+st.markdown("""
+<style>
+/* (1) 드롭존 박스 */
+section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"]{
+  background-color:#1E293B !important;
+  border:1.5px dashed #94A3B8 !important;
+  border-radius:12px !important;
+}
+
+/* (2) 호환용(기존 클래스 경로) */
+section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"],
+section[data-testid="stSidebar"] .stFileUploader > div > div{
+  background-color:#1E293B !important;
+  border:1.5px dashed #94A3B8 !important;
+  border-radius:12px !important;
+}
+
+/* (3) 드롭존 내부 안내문 텍스트만 밝게 — '버튼'은 제외 */
+section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *),
+section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *){
+  color:#EAF2FF !important;
+  opacity:1 !important;
+  filter:none !important;
+}
+
+/* (4) 업로더의 ‘Browse files’ 버튼(및 라벨)만 진하게 */
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] button,
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"],
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] button *,
+section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"] *{
+  background-color:#F1F5F9 !important;
+  color:#0F172A !important;
+  font-weight:700 !important;
+  opacity:1 !important;
+}
+/* 사이드바 selectbox(입력창) 텍스트만 검정 */
+section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *{
+  color:#0F172A !important;
+}
+
+/* (옵션) 펼쳐진 옵션 목록 텍스트도 검정 */
+div[data-baseweb="popover"] [data-baseweb="menu"] *{
+  color:#0F172A !important;
+}
+</style>
+""", unsafe_allow_html=True)
 # ----------------------------- 1) 설정값 -----------------------------
 SEED = 42
 np.random.seed(SEED)
