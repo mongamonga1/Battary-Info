@@ -367,12 +367,19 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
                 return c
         return None
 
+    # 표준 컬럼명 매핑을 구성합니다.
     mapping = {}
-    c = pick_first(['차명', '배터리종류', '차종', '모델']);                 if c: mapping[c] = 'Model'
-    c = pick_first(['사용연수(t)', '사용연수', '연식']);                    if c: mapping[c] = 'Age'
-    c = pick_first(['SoH_pred(%)', 'SoH(%)', 'SOH']);                    if c: mapping[c] = 'SoH'
-    c = pick_first(['중고거래가격', '개당가격', '거래금액', '가격']);         if c: mapping[c] = 'Price'
-    c = pick_first(['셀 간 균형', '셀간균형']);                           if c: mapping[c] = 'CellBalance'
+    schema = [
+        ("Model",       ["차명", "배터리종류", "차종", "모델"]),
+        ("Age",         ["사용연수(t)", "사용연수", "연식"]),
+        ("SoH",         ["SoH_pred(%)", "SoH(%)", "SOH"]),
+        ("Price",       ["중고거래가격", "개당가격", "거래금액", "가격"]),
+        ("CellBalance", ["셀 간 균형", "셀간균형"]),
+    ]
+    for std_name, candidates in schema:
+        c = pick_first(candidates)
+        if c:
+            mapping[c] = std_name
 
     out = out.rename(columns=mapping)
 
@@ -381,23 +388,25 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         out = out.loc[:, ~out.columns.duplicated()]
 
     # 범주 매핑(정상 추가)
-    if 'CellBalance' in out.columns:
-        out['CellBalance'] = (
-            out['CellBalance']
-            .map({'우수': 'Good', '정상': 'Normal', '경고': 'Warning', '심각': 'Critical'})
-            .fillna(out['CellBalance'])
+    if "CellBalance" in out.columns:
+        out["CellBalance"] = (
+            out["CellBalance"]
+            .map({"우수": "Good", "정상": "Normal", "경고": "Warning", "심각": "Critical"})
+            .fillna(out["CellBalance"])
         )
 
     # 숫자 정리(문자/기호 제거 후 숫자화)
-    if 'Price' in out.columns:
-        out['Price'] = (
-            out['Price'].astype(str).str.replace(r'[^\d.\-]', '', regex=True)
-                        .pipe(pd.to_numeric, errors='coerce')
+    if "Price" in out.columns:
+        out["Price"] = (
+            out["Price"]
+            .astype(str)
+            .str.replace(r"[^\d.\-]", "", regex=True)
+            .pipe(pd.to_numeric, errors="coerce")
         )
-    if 'Age' in out.columns:
-        out['Age'] = pd.to_numeric(out['Age'], errors='coerce')
-    if 'SoH' in out.columns:
-        out['SoH'] = pd.to_numeric(out['SoH'], errors='coerce')
+    if "Age" in out.columns:
+        out["Age"] = pd.to_numeric(out["Age"], errors="coerce")
+    if "SoH" in out.columns:
+        out["SoH"] = pd.to_numeric(out["SoH"], errors="coerce")
 
     return out
 
