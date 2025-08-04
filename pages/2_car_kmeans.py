@@ -63,7 +63,18 @@ apply_colors(
     sidebar_text="#DBE4FF",
     sidebar_link="#93C5FD"
 )
+import streamlit as st
 
+nav = st.navigation({
+    "": [
+        st.Page("Home.py", title="🏠 메인 대시보드"),
+        st.Page("pages/2_car_kmeans.py", title="🚗 차명별 군집분석"),
+        st.Page("pages/3_recommend.py", title="🧠 기업 추"),
+        st.Page("pages/4_forest_lstm.py", title="🌲 이상거래 의"),
+        st.Page("pages/5_timeseries.py", title="📈 시세 분석"),
+    ]
+})
+nav.run()
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
@@ -459,7 +470,7 @@ if show_profiles:
     st.markdown("<div class='caption-center'>추가 프로파일도 가로 스크롤로 확인하세요.</div>", unsafe_allow_html=True)
 
 # ───────────────────────────── GPT 요약 & Word 내보내기 ─────────────────────────────
-st.subheader("🧠 믿:음 분석결과 & Word 내보내기")
+st.subheader("🧠 믿:음 분석결과 & Word 분석보고서")
 
 if "ai_text" not in st.session_state:
     st.session_state.ai_text = None
