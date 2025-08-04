@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
-"""차명별 K-means 군집 분석 (k 자동선정, 모든 결과·프로파일 가로 스크롤)"""
+"""차명별 K-means 군집 분석 (k 자동선정, 모든 결과·프로파일 가로 스크롤 + AI 요약/Word Export)"""
 import warnings
 warnings.filterwarnings("ignore")
+
+import os, base64
+from io import BytesIO
+from pathlib import Path
+from math import pi
+from itertools import cycle
 
 import streamlit as st
 import pandas as pd
@@ -10,12 +16,6 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import seaborn as sns
 
-from pathlib import Path
-from math import pi
-from itertools import cycle
-from io import BytesIO
-import base64
-
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.cluster import KMeans
@@ -23,7 +23,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-# SciPy / Yellowbrick → 내부 계산만(표시는 X)
+# ── 옵션 라이브러리(계산 전용)
 try:
     from scipy.cluster.hierarchy import linkage
     _has_scipy = True
@@ -36,13 +36,26 @@ try:
 except Exception:
     _has_yb = False
 
-# ─────────────────────────── 설정 ───────────────────────────
+# ── AI & Word
+try:
+    from openai import OpenAI
+    _has_openai = True
+except Exception:
+    _has_openai = False
+
+try:
+    from docx import Document
+    from docx.shared import Inches
+    _has_docx = True
+except Exception:
+    _has_docx = False
+
+# ───────────────────── 기본 설정 ─────────────────────
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["axes.unicode_minus"] = False
-
 st.header("🚗 차명별 K-means 군집 분석")
 
-# ───────────────────────── 데이터 로드 ─────────────────────────
+# ───────────────────── 데이터 로드 ─────────────────────
 DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
 uploaded = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
 
@@ -60,16 +73,13 @@ else:
     st.error("기본 엑셀 파일을 찾을 수 없습니다. 사이드바에서 업로드해 주세요.")
     st.stop()
 
-# ─────────────────────── 컬럼 표준화/중복 방지 ───────────────────────
+# ───────────────────── 컬럼 표준화 ─────────────────────
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
-
     def pick_first(cands):
         for c in cands:
-            if c in out.columns:
-                return c
+            if c in out.columns: return c
         return None
-
     mapping = {}
     schema = [
         ("Model",       ["차명", "배터리종류", "차종", "모델"]),
@@ -78,49 +88,40 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         ("Price",       ["중고거래가격", "개당가격", "거래금액", "가격"]),
         ("CellBalance", ["셀 간 균형", "셀간균형"]),
     ]
-    for std, cands in schema:
+    for std,cands in schema:
         src = pick_first(cands)
-        if src:
-            mapping[src] = std
-
+        if src: mapping[src] = std
     out = out.rename(columns=mapping)
-
     if out.columns.duplicated().any():
         out = out.loc[:, ~out.columns.duplicated()]
-
     if "CellBalance" in out.columns:
         out["CellBalance"] = (
             out["CellBalance"]
-            .map({"우수": "Good", "정상": "Normal", "경고": "Warning", "심각": "Critical"})
-            .fillna(out["CellBalance"])
+              .map({"우수":"Good","정상":"Normal","경고":"Warning","심각":"Critical"})
+              .fillna(out["CellBalance"])
         )
-
     if "Price" in out.columns:
-        out["Price"] = (
-            out["Price"].astype(str)
-            .str.replace(r"[^\d.\-]", "", regex=True)
-            .pipe(pd.to_numeric, errors="coerce")
-        )
+        out["Price"] = (out["Price"].astype(str)
+                        .str.replace(r"[^\d.\-]", "", regex=True)
+                        .pipe(pd.to_numeric, errors="coerce"))
     if "Age" in out.columns:
         out["Age"] = pd.to_numeric(out["Age"], errors="coerce")
     if "SoH" in out.columns:
         out["SoH"] = pd.to_numeric(out["SoH"], errors="coerce")
-
     return out
 
 df = normalize_columns(df_raw)
 
-# 필수 컬럼/수치 컬럼
 if "Model" not in df.columns:
     st.error("엑셀에 '차명/배터리종류/차종/모델' 중 하나가 없어 Model 컬럼을 만들 수 없습니다.")
     st.stop()
 
-num_pool = [c for c in ["Age", "SoH", "Price"] if c in df.columns]
+num_pool = [c for c in ["Age","SoH","Price"] if c in df.columns]
 if len(num_pool) < 2:
     st.error(f"수치 컬럼이 부족합니다(필요≥2). 현재: {num_pool}")
     st.stop()
 
-# ───────────────────────── 사이드바 ─────────────────────────
+# ───────────────────── 사이드바 ─────────────────────
 models        = sorted(df["Model"].dropna().astype(str).unique())
 choice        = st.sidebar.selectbox("차명 선택", models)
 show_tsne     = st.sidebar.checkbox("t-SNE 2D 추가", value=True)
@@ -128,9 +129,8 @@ show_pca3     = st.sidebar.checkbox("PCA 3D 추가", value=False)
 perplexity    = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
 show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", value=True)
 
-# ───────────────────────── 데이터 준비 ─────────────────────────
-sub_all = df[df["Model"].astype(str) == str(choice)].copy()
-sub_all = sub_all.dropna(subset=num_pool)
+# ───────────────────── 모델 데이터 준비 ─────────────────────
+sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
 n = len(sub_all)
 if n < 3:
     st.warning(f"'{choice}' 유효 표본이 {n}건이라 분석할 수 없습니다(≥3 필요).")
@@ -147,169 +147,255 @@ preproc = ColumnTransformer(
     remainder="drop",
 )
 X = preproc.fit_transform(sub_all)
-if hasattr(X, "toarray"):
-    X = X.toarray()
+if hasattr(X, "toarray"): X = X.toarray()
 
-# ───────────── k 선택: Silhouette + Elbow + Dendrogram → Median ─────────────
+# ───────────── k = Silhouette + Elbow + Dendrogram → 중앙값 ─────────────
 def choose_k_multi(X, ks):
     votes = {}
-    # Silhouette
     try:
-        sil_scores = [
-            silhouette_score(X, KMeans(n_clusters=k, random_state=42, n_init="auto").fit_predict(X))
-            for k in ks if k < len(X)
-        ]
-        if sil_scores:
-            votes["silhouette"] = ks[int(np.argmax(sil_scores))]
-    except Exception:
-        pass
-    # Elbow
+        sil_scores = [silhouette_score(X, KMeans(n_clusters=k, random_state=42, n_init="auto")
+                          .fit_predict(X)) for k in ks if k < len(X)]
+        if sil_scores: votes["silhouette"] = ks[int(np.argmax(sil_scores))]
+    except Exception: pass
     try:
         if _has_yb:
             viz = KElbowVisualizer(KMeans(random_state=42), k=ks, metric="distortion", timings=False)
-            viz.fit(X)
-            if viz.elbow_value_ is not None:
-                votes["elbow"] = int(viz.elbow_value_)
+            viz.fit(X); 
+            if viz.elbow_value_ is not None: votes["elbow"] = int(viz.elbow_value_)
         else:
             inertias = [KMeans(n_clusters=k, random_state=42, n_init="auto").fit(X).inertia_ for k in ks]
             if len(inertias) >= 2:
-                diffs = np.diff(inertias)
-                idx = int(np.argmax(diffs))
-                votes["elbow"] = ks[idx + 1] if idx + 1 < len(ks) else ks[-1]
-    except Exception:
-        pass
-    # Dendrogram gap
+                diffs = np.diff(inertias); idx = int(np.argmax(diffs))
+                votes["elbow"] = ks[idx+1] if idx+1 < len(ks) else ks[-1]
+    except Exception: pass
     try:
         if _has_scipy:
-            n = X.shape[0]
-            idx = np.arange(n if n <= 200 else 200)
+            m = X.shape[0]; idx = np.arange(m if m <= 200 else 200)
             Z = linkage(X[idx], method="ward")
-            dists = Z[:, 2]; gaps = np.diff(dists)
+            dists = Z[:,2]; gaps = np.diff(dists)
             if len(gaps) >= 1:
-                k_est = n - (int(np.argmax(gaps)) + 1)
+                k_est = m - (int(np.argmax(gaps))+1)
                 votes["dendrogram"] = max(2, min(k_est, ks[-1]))
-    except Exception:
-        pass
-
+    except Exception: pass
     vals = [v for v in [votes.get("silhouette"), votes.get("elbow"), votes.get("dendrogram")] if v is not None]
-    k_final = int(np.median(vals)) if vals else 3
-    return k_final, votes
+    return (int(np.median(vals)) if vals else 3), votes
 
 k_final, votes = choose_k_multi(X, ks)
 st.caption(f"선택된 k = {k_final} (Sil={votes.get('silhouette','—')}, "
            f"Elbow={votes.get('elbow','—')}, Dend={votes.get('dendrogram','—')} → median)")
 
-# ───────────────────────── 학습 & 라벨 ─────────────────────────
+# ───────────────────── 학습 & 라벨 ─────────────────────
 labels = KMeans(n_clusters=k_final, random_state=42, n_init="auto").fit_predict(X)
-sub_all = sub_all.copy()
-sub_all["cluster"] = labels
+sub_all = sub_all.copy(); sub_all["cluster"] = labels
 clusters = sorted(sub_all["cluster"].unique())
 
-# 공용: Matplotlib Figure → base64 PNG
-def fig_to_base64(fig) -> str:
-    buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
+# ── 유틸: fig png 변환 & base64
+def fig_to_png(fig, dpi=160):
+    buf = BytesIO(); fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight"); plt.close(fig)
+    return buf.getvalue()
 
-# 공용: 가로 스크롤 컨테이너 스타일
+def to_b64(png_bytes): return base64.b64encode(png_bytes).decode("utf-8")
+
+# ── 공통 CSS(가로 스크롤)
 st.markdown("""
 <style>
-.scroll-x { overflow-x: auto; padding: 8px 0 10px; }
-.scroll-row { display: inline-flex; gap: 16px; }
-.scroll-row img { border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-.caption-center { text-align:center; color: #6b7280; font-size: 12px; }
+.scroll-x { overflow-x:auto; padding:8px 0 10px; }
+.scroll-row { display:inline-flex; gap:16px; }
+.scroll-row img { border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.12); }
+.caption-center { text-align:center; color:#6b7280; font-size:12px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────────────── 결과 그래프(가로 스크롤) ─────────────────────────
-main_figs = []
+# ───────────────────── 결과 그래프(가로 스크롤) ─────────────────────
+main_images = []  # (caption, png_bytes)
 
 # PCA 2D
 p2 = PCA(2, random_state=42).fit_transform(X)
-f = plt.figure(figsize=(5.2, 4.0))
-plt.scatter(p2[:, 0], p2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+fig = plt.figure(figsize=(5.2, 4.0))
+plt.scatter(p2[:,0], p2[:,1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
 plt.title(f"{choice}: PCA 2D (k={k_final})"); plt.xlabel("PC1"); plt.ylabel("PC2"); plt.tight_layout()
-main_figs.append(fig_to_base64(f))
+png = fig_to_png(fig); main_images.append(("PCA 2D", png))
 
-# Radar(클러스터 평균, 0~1 정규화)
+# Radar (클러스터 평균, 0~1 정규화)
 mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
 norm_means = mean_matrix.copy()
 for c in num_pool:
     mn, mx = df[c].min(), df[c].max()
-    norm_means[c] = 0.5 if (pd.isna(mn) or pd.isna(mx) or mx == mn) else (norm_means[c] - mn) / (mx - mn)
+    norm_means[c] = 0.5 if (pd.isna(mn) or pd.isna(mx) or mx==mn) else (norm_means[c]-mn)/(mx-mn)
 
-angles = [i / len(num_pool) * 2 * pi for i in range(len(num_pool))] + [0]
-f = plt.figure(figsize=(5.2, 4.0))
-ax = plt.subplot(111, polar=True)
+angles = [i/len(num_pool)*2*pi for i in range(len(num_pool))] + [0]
+fig = plt.figure(figsize=(5.2, 4.0)); ax = plt.subplot(111, polar=True)
 for i in clusters:
-    vals = norm_means.loc[i].tolist(); vals.append(vals[0])
+    vals = norm_means.loc[i].tolist() + [norm_means.loc[i].tolist()[0]]
     ax.plot(angles, vals, label=f"Cluster {i}"); ax.fill(angles, vals, alpha=0.1)
 ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
-plt.title(f"{choice}: Radar (k={k_final})")
-plt.legend(loc="upper right", bbox_to_anchor=(1.25, 1.05))
-main_figs.append(fig_to_base64(f))
+plt.title(f"{choice}: Radar (k={k_final})"); plt.legend(loc="upper right", bbox_to_anchor=(1.25,1.05))
+png = fig_to_png(fig); main_images.append(("Radar", png))
 
-# t-SNE 2D (옵션: 오른쪽에 추가)
+# t-SNE 2D (옵션)
 if show_tsne:
-    perp = min(perplexity, n - 1)
+    perp = min(perplexity, n-1)
     ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
-    f = plt.figure(figsize=(5.2, 4.0))
-    plt.scatter(ts2[:, 0], ts2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+    fig = plt.figure(figsize=(5.2, 4.0))
+    plt.scatter(ts2[:,0], ts2[:,1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
     plt.title(f"{choice}: t-SNE 2D (k={k_final})"); plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
-    main_figs.append(fig_to_base64(f))
+    png = fig_to_png(fig); main_images.append(("t-SNE 2D", png))
 
-# PCA 3D (옵션: 오른쪽에 추가)
+# PCA 3D (옵션)
 if show_pca3:
-    from mpl_toolkits.mplot3d import Axes3D  # noqa
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
     p3 = PCA(3, random_state=42).fit_transform(X)
-    f = plt.figure(figsize=(5.6, 4.2))
-    ax3 = f.add_subplot(111, projection="3d")
-    ax3.scatter(p3[:, 0], p3[:, 1], p3[:, 2], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
-    ax3.set_title(f"{choice}: PCA 3D (k={k_final})")
-    ax3.set_xlabel("PC1"); ax3.set_ylabel("PC2"); ax3.set_zlabel("PC3")
-    main_figs.append(fig_to_base64(f))
+    fig = plt.figure(figsize=(5.6, 4.2)); ax3 = fig.add_subplot(111, projection="3d")
+    ax3.scatter(p3[:,0], p3[:,1], p3[:,2], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
+    ax3.set_title(f"{choice}: PCA 3D (k={k_final})"); ax3.set_xlabel("PC1"); ax3.set_ylabel("PC2"); ax3.set_zlabel("PC3")
+    png = fig_to_png(fig); main_images.append(("PCA 3D", png))
 
-# 출력: 메인 결과 가로 스크롤
-html_main = "".join([f"<img src='data:image/png;base64,{b}' height='320'/>" for b in main_figs])
-st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_main}</div></div>", unsafe_allow_html=True)
-st.markdown("<div class='caption-center'>좌우 스크롤로 모든 결과 그래프(PCA 2D, Radar, 옵션: t-SNE/PCA 3D)를 확인하세요.</div>", unsafe_allow_html=True)
+# 화면 표시(가로 스크롤)
+html_imgs = "".join([f"<img src='data:image/png;base64,{to_b64(p)}' height='320'/>" for _,p in main_images])
+st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_imgs}</div></div>", unsafe_allow_html=True)
+st.markdown("<div class='caption-center'>좌우 스크롤로 결과 그래프(PCA2D, Radar, 옵션: t-SNE/PCA3D)를 확인하세요.</div>", unsafe_allow_html=True)
 
-# ───────────────────────── 추가 프로파일(가로 스크롤) ─────────────────────────
+# ───────────────────── 추가 프로파일(가로 스크롤) ─────────────────────
+profile_images = []
 if show_profiles:
-    figs = []
-
-    # 1) Boxplots (바이올린 차트 제거)
+    # Boxplots
     for col in num_pool:
-        f = plt.figure(figsize=(6, 4))
-        sns.boxplot(x="cluster", y=col, data=sub_all, palette="tab10")
+        fig = plt.figure(figsize=(6,4)); sns.boxplot(x="cluster", y=col, data=sub_all, palette="tab10")
         plt.title(f"{choice}: {col} by Cluster (k={k_final})")
-        figs.append(fig_to_base64(f))
-
-    # 2) 범주 Count + Stacked(%) Bar (있을 때)
+        profile_images.append((f"Box {col}", fig_to_png(fig)))
+    # Count & Stacked
     if "CellBalance" in sub_all.columns:
-        f = plt.figure(figsize=(6, 4))
+        fig = plt.figure(figsize=(6,4))
         sns.countplot(x="cluster", hue="CellBalance", data=sub_all, palette="Set2")
         plt.title(f"{choice}: Count of CellBalance by Cluster")
-        figs.append(fig_to_base64(f))
+        profile_images.append(("Count CellBalance", fig_to_png(fig)))
 
-        ctab_pct = pd.crosstab(sub_all["cluster"], sub_all["CellBalance"], normalize="index") * 100
+        ctab_pct = pd.crosstab(sub_all["cluster"], sub_all["CellBalance"], normalize="index")*100
         ctab_pct = ctab_pct.reindex(clusters, fill_value=0)
-        f = plt.figure(figsize=(6, 4))
-        ax2 = plt.gca()
-        ctab_pct.plot(kind="bar", stacked=True, colormap="Paired", ax=ax2)
-        plt.title(f"{choice}: CellBalance Distribution (%) by Cluster")
-        plt.tight_layout()
-        figs.append(fig_to_base64(f))
-
-    # 3) Heatmap of means
+        fig = plt.figure(figsize=(6,4)); ax = plt.gca()
+        ctab_pct.plot(kind="bar", stacked=True, colormap="Paired", ax=ax)
+        plt.title(f"{choice}: CellBalance Distribution (%) by Cluster"); plt.tight_layout()
+        profile_images.append(("Stacked CellBalance", fig_to_png(fig)))
+    # Heatmap
     mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
-    f = plt.figure(figsize=(6, 4))
+    fig = plt.figure(figsize=(6,4))
     sns.heatmap(mean_matrix, annot=True, cmap="coolwarm", fmt=".2f")
     plt.title(f"{choice}: Numeric Feature Means per Cluster")
-    figs.append(fig_to_base64(f))
+    profile_images.append(("Heatmap Means", fig_to_png(fig)))
 
-    # 출력: 추가 프로파일 가로 스크롤
-    html_prof = "".join([f"<img src='data:image/png;base64,{b}' height='300'/>" for b in figs])
+    html_prof = "".join([f"<img src='data:image/png;base64,{to_b64(p)}' height='300'/>" for _,p in profile_images])
     st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_prof}</div></div>", unsafe_allow_html=True)
-    st.markdown("<div class='caption-center'>가로 스크롤(드래그바)을 좌우로 움직여 모든 추가 프로파일을 확인하세요.</div>", unsafe_allow_html=True)
+    st.markdown("<div class='caption-center'>추가 프로파일도 가로 스크롤로 확인하세요.</div>", unsafe_allow_html=True)
+
+# ───────────────────── AI 요약 & Word 내보내기 ─────────────────────
+st.subheader("🧠 AI 요약 & Word 내보내기")
+
+def build_stats_text(dfm: pd.DataFrame) -> str:
+    counts = dfm["cluster"].value_counts().sort_index()
+    means  = dfm.groupby("cluster")[num_pool].mean()
+    lines = [f"총 표본수: {len(dfm)}", f"클러스터 개수: {dfm['cluster'].nunique()}"]
+    for c in counts.index:
+        part = f"Cluster {c}: 개수 {int(counts[c])}, " + ", ".join([f"{col} 평균 {means.loc[c, col]:.2f}" for col in num_pool])
+        lines.append(part)
+    return "\n".join(lines)
+
+def generate_ai_summary(model: str, k_final: int, votes: dict, dfm: pd.DataFrame) -> str:
+    # API 키
+    api_key = st.secrets.get("OPENAI_API_KEY", None) if hasattr(st, "secrets") else None
+    api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    stats = build_stats_text(dfm)
+    prompt = f"""
+당신은 배터리 중고거래 분석 전문가입니다. 아래 정보를 바탕으로 한국어로 250~350자 사이의 실행요약을 작성하세요.
+- 차종: {model}
+- 최종 k: {k_final} (Sil={votes.get('silhouette')}, Elbow={votes.get('elbow')}, Dend={votes.get('dendrogram')})
+- 통계 요약:
+{stats}
+요약에는 각 군집의 특성(연식/SoH/가격 경향)과 활용 포인트(예: 리마케팅/정비/추가 점검 권고)를 간결히 포함하세요.
+"""
+    if not (_has_openai and api_key):
+        # API가 없으면 로컬 요약 반환
+        return ("[로컬 요약] 차종 {model}에 대해 k={k_final}로 군집화했습니다. "
+                "연식·SoH·가격 평균을 바탕으로 군집별 특성이 구분되며, "
+                "고SoH·고가 군집은 프리미엄 리마케팅, 저SoH 군집은 성능점검/수리 권고가 유효합니다.").format(
+                    model=model, k_final=k_final)
+
+    try:
+        client = OpenAI(api_key=api_key)
+        res = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role":"system","content":"You are a concise Korean data analyst."},
+                {"role":"user","content": prompt},
+            ],
+            temperature=0.2,
+        )
+        return res.choices[0].message.content.strip()
+    except Exception as e:
+        return f"[요약 생성 실패: {e}]"
+
+def export_word(doc_title: str, model: str, summary: str,
+                main_imgs: list[tuple[str, bytes]],
+                profile_imgs: list[tuple[str, bytes]],
+                dfm: pd.DataFrame) -> BytesIO:
+    if not _has_docx:
+        raise RuntimeError("python-docx가 설치되어 있지 않습니다. requirements에 python-docx를 추가하세요.")
+    doc = Document()
+    doc.add_heading(doc_title, level=0)
+    doc.add_paragraph(f"모델: {model}")
+    doc.add_paragraph(f"k (최종): {k_final}  / 근거: Sil={votes.get('silhouette')}, Elbow={votes.get('elbow')}, Dend={votes.get('dendrogram')}")
+
+    doc.add_heading("요약", level=1)
+    doc.add_paragraph(summary)
+
+    doc.add_heading("주요 시각화", level=1)
+    for cap, png in main_imgs:
+        doc.add_paragraph(cap)
+        doc.add_picture(BytesIO(png), width=Inches(6.2))
+
+    # 간단 통계표
+    doc.add_heading("클러스터 요약 통계", level=1)
+    counts = dfm["cluster"].value_counts().sort_index()
+    means  = dfm.groupby("cluster")[num_pool].mean().round(2)
+    tbl = doc.add_table(rows=1, cols=2+len(num_pool))
+    hdr = tbl.rows[0].cells
+    hdr[0].text = "Cluster"; hdr[1].text = "Count"
+    for i,c in enumerate(num_pool, start=2): hdr[i].text = f"Mean {c}"
+    for c in counts.index:
+        row = tbl.add_row().cells
+        row[0].text = str(c); row[1].text = str(int(counts[c]))
+        for i,col in enumerate(num_pool, start=2): row[i].text = str(means.loc[c, col])
+
+    if profile_imgs:
+        doc.add_heading("추가 프로파일", level=1)
+        for cap, png in profile_imgs:
+            doc.add_paragraph(cap)
+            doc.add_picture(BytesIO(png), width=Inches(6.2))
+
+    bio = BytesIO()
+    doc.save(bio); bio.seek(0)
+    return bio
+
+col_a, col_b = st.columns([1,2])
+with col_a:
+    gen_btn = st.button("🧠 AI 요약 만들기 & Word로 내보내기", use_container_width=True)
+
+if gen_btn:
+    with st.spinner("AI 요약 생성 및 Word 문서 작성 중..."):
+        ai_text = generate_ai_summary(choice, k_final, votes, sub_all)
+        # Word에 넣을 이미지: 결과(필수) + 프로파일(옵션)
+        word_buf = export_word(
+            doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
+            model=choice,
+            summary=ai_text,
+            main_imgs=main_images,
+            profile_imgs=profile_images if show_profiles else [],
+            dfm=sub_all
+        )
+    st.success("보고서를 생성했습니다.")
+    st.download_button(
+        "⬇️ Word 파일 다운로드",
+        data=word_buf,
+        file_name=f"EV_Battery_Report_{choice}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True,
+    )
