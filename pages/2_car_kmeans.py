@@ -39,7 +39,7 @@ def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF"
 apply_colors(
     page_bg="#F5F7FB",
     sidebar_bg="#0F172A",
-    sidebar_text="#F5F7FB",    # ← 순백으로 진하게
+    sidebar_text="#00000",    # ← 순백으로 진하게
     sidebar_link="#93C5FD"
 )
 
