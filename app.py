@@ -60,6 +60,19 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.markdown("""
+<style>
+  [data-testid="stSidebar"] .brand-wrap{
+    position: sticky; top: 0; z-index: 10;
+    background:#0f1b2d;               /* 사이드바 배경에 맞춤 */
+    padding:10px 12px 8px; margin:0 -8px 8px -8px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  [data-testid="stSidebar"] .brand{
+    font-weight:900; font-size:18px; letter-spacing:.6px; color:#ffffff;
+  }
+</style>
+""", unsafe_allow_html=True)
 # ───────────────────── 기본 Pages 내비/검색 숨기기 ─────────────────────
 st.markdown(
     """
@@ -146,6 +159,8 @@ def load_data(path: Path) -> pd.DataFrame | None:
 df = load_data(DATA_PATH)
 
 # ───────────────────── 사이드바: 커스텀 메뉴(방법B) ─────────────────────
+st.markdown('<div class="brand-wrap"><div class="brand">BATTERY-INFO</div></div>', unsafe_allow_html=True)
+
 with st.sidebar:
     st.markdown("### 📂 메뉴", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
     # ⚠️ 실제 파일명으로 경로를 맞추세요. 예: 'pages/01_car kmeans.py'
