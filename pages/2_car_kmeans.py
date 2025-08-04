@@ -21,80 +21,25 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-# ── 색상만 바꾸는 경량 테마 주입(레이아웃/기능 영향 없음) ─────────────
-import streamlit as st
 
-def apply_colors(
-    page_bg="#F5F7FB",        # 본문(페이지) 배경
-    sidebar_bg="#0F172A",     # 왼쪽 메뉴바 배경
-    sidebar_text="#DBE4FF",   # 메뉴바 일반 글자
-    sidebar_link="#93C5FD"    # 메뉴바 링크/아이콘 포커스 색
-):
+# ── 경량 테마(색상) ──────────────────────────────────────────────
+def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF", sidebar_link="#93C5FD"):
     st.markdown(f"""
     <style>
-      /* 전체 페이지 배경 */
       .stApp {{ background: {page_bg}; }}
-
-      /* 왼쪽 사이드바 */
-      section[data-testid="stSidebar"] {{
-        background: {sidebar_bg};
+      section[data-testid="stSidebar"] {{ background: {sidebar_bg}; }}
+      section[data-testid="stSidebar"] * {{ color: {sidebar_text} !important; }}
+      section[data-testid="stSidebar"] a, section[data-testid="stSidebar"] svg {{
+        color: {sidebar_link} !important; fill: {sidebar_link} !important;
       }}
-      section[data-testid="stSidebar"] * {{
-        color: {sidebar_text} !important;
-      }}
-      section[data-testid="stSidebar"] a,
-      section[data-testid="stSidebar"] svg {{
-        color: {sidebar_link} !important;
-        fill:  {sidebar_link} !important;
-      }}
-
-      /* 메뉴 hover/선택 시 살짝 밝게 */
-      section[data-testid="stSidebar"] a:hover {{
-        background-color: rgba(255,255,255,0.08) !important;
-        border-radius: 8px;
-      }}
+      section[data-testid="stSidebar"] a:hover {{ background-color: rgba(255,255,255,0.08) !important; border-radius: 8px; }}
     </style>
     """, unsafe_allow_html=True)
 
-# 호출(원하는 색으로 바꾸면 됨)
-apply_colors(
-    page_bg="#F5F7FB",     # 예: 밝은 회색 배경
-    sidebar_bg="#0F172A",  # 예: 네이비 사이드바
-    sidebar_text="#DBE4FF",
-    sidebar_link="#93C5FD"
-)
-
-current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ts], position="hidden")
-
-# ───────────────────── 사이드바(공통) ─────────────────────
-with st.sidebar:
-    st.markdown(
-        '<div style="position:sticky;top:0;z-index:10;background:#0f1b2d;padding:12px 12px 6px;'
-        'margin:0 -8px 8px -8px;border-bottom:1px solid rgba(255,255,255,.06);">'
-        '<div style="font-weight:900;font-size:24px;letter-spacing:.8px;color:#fff;line-height:1.2;">BATTERY-INFO</div>'
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    # ✅ 여기 추가: 홈으로 가는 링크 (home Page 객체 사용)
-    st.page_link(home, label="메인 화면", icon="🏠")
-
-    st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
-    st.page_link(pg_kmeans, label="군집 분석",     icon="🚗")
-    st.page_link(pg_reco,   label="기업 추천",     icon="✨")
-    st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
-    st.page_link(pg_ts,     label="시세 분석",     icon="📈")
-
-# 선택된 페이지 실행
-current.run()
+apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF", sidebar_link="#93C5FD")
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
-    """
-    반환: (api_key:str|None, model_name:str|None)
-    - Streamlit Secrets의 [openai].api_key / [openai].model 우선
-    - st.secrets["OPENAI_API_KEY"] / 환경변수 OPENAI_API_KEY 도 허용
-    """
     api_key = None
     model_name = None
     if hasattr(st, "secrets") and "openai" in st.secrets:
@@ -145,25 +90,12 @@ def _add_step(doc, n, title):
     p = doc.add_paragraph(f"Step {n}: {title}")
     p.style = "Heading 1"
 
-def export_word_like_full(
-    doc_title,
-    model,
-    gpt_analysis_text,
-    main_imgs,          # list of (caption, png_bytes)
-    profile_imgs,       # list of (caption, png_bytes)
-    dfm,                # pandas.DataFrame (must include 'cluster')
-    num_pool,           # list[str]
-    votes,              # dict
-    k_final,
-    font_name="Malgun Gothic",
-):
+def export_word_like_full(doc_title, model, gpt_analysis_text, main_imgs, profile_imgs,
+                          dfm, num_pool, votes, k_final, font_name="Malgun Gothic"):
     doc = Document()
     _apply_korean_fonts(doc, font_name=font_name, size_pt=11)
-
-    # Title
     doc.add_heading(f"EV Battery Clustering Report – {model}", level=0)
 
-    # Step 1~4
     _add_step(doc, 1, "Data Loading & Preprocessing")
     doc.add_paragraph("✅ 1단계 완료: 데이터 로드 및 전처리 완료.")
     _add_step(doc, 2, "Model Selection & Filtering")
@@ -182,7 +114,6 @@ def export_word_like_full(
     counts = dfm["cluster"].value_counts().sort_index()
     doc.add_paragraph("✅ 4단계 완료: " + " / ".join([f"Cluster {c} → {int(counts[c])}개" for c in counts.index]))
 
-    # Step 5: 시각화
     _add_step(doc, 5, "Visualizations")
     viz_idx = 1
     def add_img(cap, png_bytes):
@@ -193,14 +124,12 @@ def export_word_like_full(
     for cap, png in main_imgs:    add_img(cap, png)
     for cap, png in profile_imgs: add_img(cap, png)
 
-    # Step 6: 클러스터 요약 (GPT 생성 본문)
     _add_step(doc, 6, "Cluster-wise Summary")
     for para in str(gpt_analysis_text).split("\n"):
         if para.strip():
             doc.add_paragraph(para.strip())
     doc.add_paragraph("✅ 6단계 완료: 클러스터별 통계 요약 완료.")
 
-    # 마지막 표(평균)
     means = dfm.groupby("cluster")[num_pool].mean().round(2)
     tbl = doc.add_table(rows=1, cols=2 + len(num_pool))
     hdr = tbl.rows[0].cells
@@ -212,17 +141,8 @@ def export_word_like_full(
         for j, col in enumerate(num_pool, start=2):
             row[j].text = str(means.loc[c, col])
 
-    bio = BytesIO()
-    doc.save(bio)
-    bio.seek(0)
+    bio = BytesIO(); doc.save(bio); bio.seek(0)
     return bio
-
-# ───────────────────────────── OpenAI (Chat Completions) ─────────────────────────────
-try:
-    from openai import OpenAI
-    _has_openai = True
-except Exception:
-    _has_openai = False
 
 # ───────────────────────────── 기본 설정 ─────────────────────────────
 mpl.rcParams["font.family"] = "DejaVu Sans"
@@ -239,8 +159,7 @@ def load_excel(path_or_buffer) -> pd.DataFrame:
     return df
 
 if uploaded:
-    df_raw = load_excel(uploaded)
-    st.success("업로드한 파일을 사용합니다.")
+    df_raw = load_excel(uploaded); st.success("업로드한 파일을 사용합니다.")
 elif DATA_PATH.exists():
     df_raw = load_excel(DATA_PATH)
 else:
@@ -262,24 +181,20 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         ("Price",       ["중고거래가격", "개당가격", "거래금액", "가격"]),
         ("CellBalance", ["셀 간 균형", "셀간균형"]),
     ]
-    for std,cands in schema:
+    for std, cands in schema:
         src = pick_first(cands)
         if src: mapping[src] = std
     out = out.rename(columns=mapping)
-
     if out.columns.duplicated().any():
         out = out.loc[:, ~out.columns.duplicated()]
-
     if "CellBalance" in out.columns:
         out["CellBalance"] = (
             out["CellBalance"]
-              .map({"우수":"Good","정상":"Normal","경고":"Warning","심각":"Critical"})
-              .fillna(out["CellBalance"])
+            .map({"우수":"Good","정상":"Normal","경고":"Warning","심각":"Critical"})
+            .fillna(out["CellBalance"])
         )
-
     if "Price" in out.columns:
-        out["Price"] = (out["Price"].astype(str)
-                        .str.replace(r"[^\d.\-]", "", regex=True)
+        out["Price"] = (out["Price"].astype(str).str.replace(r"[^\d.\-]", "", regex=True)
                         .pipe(pd.to_numeric, errors="coerce"))
     if "Age" in out.columns:
         out["Age"] = pd.to_numeric(out["Age"], errors="coerce")
@@ -299,7 +214,7 @@ if len(num_pool) < 2:
     st.error(f"수치 컬럼이 부족합니다(필요≥2). 현재: {num_pool}")
     st.stop()
 
-# ───────────────────────────── 사이드바 ─────────────────────────────
+# ───────────────────────────── 사이드바 컨트롤(이 페이지 전용) ─────────────────────────────
 models        = sorted(df["Model"].dropna().astype(str).unique())
 choice        = st.sidebar.selectbox("차명 선택", models)
 show_tsne     = st.sidebar.checkbox("t-SNE 2D 추가", value=True)
@@ -309,18 +224,14 @@ show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", val
 
 # 💸 비용 옵션 (최소 과금 구조)
 st.sidebar.markdown("### 💸 비용 옵션")
-cost_saver = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
+cost_saver   = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
 DEFAULT_MODEL = "gpt-4o-mini"
-
 _api_key, _model_from_secret = get_openai_conf()
-MODEL_NAME = _model_from_secret or DEFAULT_MODEL
-TEMPERATURE = st.sidebar.slider("요약 temperature", 0.0, 1.0, 0.2, 0.05)
-MAX_TOKENS  = 320 if cost_saver else 600
-
-if _api_key:
-    st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
-else:
-    st.sidebar.warning("🔒 OPENAI_API_KEY 미설정 → 로컬 요약으로 대체")
+MODEL_NAME   = _model_from_secret or DEFAULT_MODEL
+TEMPERATURE  = st.sidebar.slider("요약 temperature", 0.0, 1.0, 0.2, 0.05)
+MAX_TOKENS   = 320 if cost_saver else 600
+if _api_key: st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
+else:        st.sidebar.warning("🔒 OPENAI_API_KEY 미설정 → 로컬 요약으로 대체")
 
 # ───────────────────────────── 모델 데이터 준비 ─────────────────────────────
 sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
@@ -330,7 +241,6 @@ if n < 3:
     st.stop()
 
 ks = list(range(2, min(10, n)))
-
 preproc = ColumnTransformer(
     transformers=[
         ("num", StandardScaler(), num_pool),
@@ -498,6 +408,12 @@ def summarize_compact(dfm: pd.DataFrame, num_pool: list[str]) -> str:
     return line_counts + "\n" + line_means
 
 def generate_ai_summary(model, k_final, votes, dfm, num_pool, model_name, max_tokens, temperature):
+    try:
+        from openai import OpenAI
+        _has_openai = True
+    except Exception:
+        _has_openai = False
+
     stats_compact = summarize_compact(dfm, num_pool)
     try:
         if not _has_openai:
@@ -528,7 +444,6 @@ def generate_ai_summary(model, k_final, votes, dfm, num_pool, model_name, max_to
         )
         return resp.choices[0].message.content.strip()
     except Exception:
-        # 폴백: 로컬 간단 요약
         cluster_means = dfm.groupby("cluster")[num_pool].mean().round(1)
         top_price = cluster_means["Price"].idxmax() if "Price" in cluster_means.columns else "—"
         return (f"[로컬 요약] {model}을(를) k={k_final}로 군집화했습니다. "
@@ -547,27 +462,17 @@ with col_b:
 if gen_btn:
     with st.spinner("GPT 분석결과 생성 및 Word 문서 작성 중..."):
         ai_text = generate_ai_summary(
-            model=choice,
-            k_final=k_final,
-            votes=votes,
-            dfm=sub_all,
-            num_pool=num_pool,
-            model_name=MODEL_NAME,
-            max_tokens=MAX_TOKENS,
-            temperature=TEMPERATURE
+            model=choice, k_final=k_final, votes=votes, dfm=sub_all,
+            num_pool=num_pool, model_name=MODEL_NAME,
+            max_tokens=MAX_TOKENS, temperature=TEMPERATURE
         )
         st.session_state.ai_text = ai_text
 
         word_buf = export_word_like_full(
             doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
-            model=choice,
-            gpt_analysis_text=ai_text,
-            main_imgs=main_images,
-            profile_imgs=profile_images if show_profiles else [],
-            dfm=sub_all,
-            num_pool=num_pool,
-            votes=votes,
-            k_final=k_final,
+            model=choice, gpt_analysis_text=ai_text,
+            main_imgs=main_images, profile_imgs=profile_images if show_profiles else [],
+            dfm=sub_all, num_pool=num_pool, votes=votes, k_final=k_final,
             font_name="Malgun Gothic"
         )
 
