@@ -67,11 +67,11 @@ import streamlit as st
 
 nav = st.navigation({
     "": [
-        st.Page("Home.py", title="🏠 메인 대시보드"),
+        st.Page("app.py", title="🏠 메인 대시보드"),
         st.Page("pages/2_car_kmeans.py", title="🚗 차명별 군집분석"),
-        st.Page("pages/3_recommend.py", title="🧠 기업 추"),
-        st.Page("pages/4_forest_lstm.py", title="🌲 이상거래 의"),
-        st.Page("pages/5_timeseries.py", title="📈 시세 분석"),
+        st.Page("pages/4_recommend_system.py", title="🧠 기업 추"),
+        st.Page("pages/5_forest_lstm.py", title="🌲 이상거래 의"),
+        st.Page("pages/5_timeseries_analysis.py", title="📈 시세 분석"),
     ]
 })
 nav.run()
