@@ -112,10 +112,10 @@ df = load_data(DATA_PATH)
 with st.sidebar:
     st.markdown("### 📂 메뉴", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
     # ⚠️ 실제 파일명으로 경로를 맞추세요. 예: 'pages/01_car kmeans.py'
-    st.page_link("pages/car kmeans.py",           label="car kmeans",          icon="🚗")
-    st.page_link("pages/recommend system.py",     label="recommend system",    icon="✨")
-    st.page_link("pages/forest lstm.py",          label="forest lstm",         icon="🌳")
-    st.page_link("pages/timeseries analysis.py",  label="timeseries analysis", icon="📈")
+    st.page_link("pages/2_car_kmeans.py",           label="군집 분석",          icon="🚗")
+    st.page_link("pages/4_recommend_system.py",     label="기업 추천",    icon="✨")
+    st.page_link("pages/5_forest_lstm.py",          label="이상거래 의심",         icon="🌳")
+    st.page_link("pages/5_timeseries_analysis.py",  label="시세 분석", icon="📈")
 
     st.divider()
     st.caption("CSV 업로드(미리보기용)")
