@@ -22,6 +22,25 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+# 사이드바 상단 브랜드(크게) + 고정
+st.markdown("""
+<style>
+  [data-testid="stSidebar"] .brand-wrap{
+    position: sticky; top: 0; z-index: 10;
+    background:#0f1b2d;               /* 사이드바 배경색과 동일 */
+    padding:12px 12px 6px; margin:0 -8px 8px -8px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  [data-testid="stSidebar"] .brand-title{
+    font-weight: 900;
+    font-size: 24px;                   /* ← 크게 보이게 */
+    letter-spacing: .8px;
+    color:#ffffff;
+    line-height: 1.2;
+  }
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
   /* 브랜드 텍스트(맨 위) */
@@ -159,7 +178,12 @@ def load_data(path: Path) -> pd.DataFrame | None:
 df = load_data(DATA_PATH)
 
 # ───────────────────── 사이드바: 커스텀 메뉴(방법B) ─────────────────────
-st.markdown('<div class="brand-wrap"><div class="brand">BATTERY-INFO</div></div>', unsafe_allow_html=True)
+with st.sidebar:
+    # 상단 고정 브랜드
+    st.markdown(
+        '<div class="brand-wrap"><div class="brand-title">BATTERY-INFO</div></div>',
+        unsafe_allow_html=True
+    )
 
 with st.sidebar:
     st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
