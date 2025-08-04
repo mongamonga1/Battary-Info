@@ -44,23 +44,19 @@ apply_colors(
 )
 st.markdown("""
 <style>
-  /* 파일 업로더 드롭존: 배경/글자색을 강제로 재설정 */
+  /* 사이드바 파일 업로더: 배경만 어둡게 바꿔서 기존 흰 글자가 보이도록 */
   section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"]{
-    background:#FFFFFF !important;
-    color:#111827 !important;      /* 기본 글자색(거의 검정) */
+    background: #1E293B;      /* slate-800 계열 */
+    border: 1.5px dashed #94A3B8;
+    border-radius: 12px;
   }
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] *{
-    color:#111827 !important;      /* 내부 모든 텍스트 */
-    opacity:1 !important;
-    filter:none !important;
-  }
-  /* 혹시 아이콘(SVG)이 흰색이면 */
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] svg{
-    fill:#111827 !important;
+  /* 안내문/보조문구 약간 더 선명하게 */
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] p,
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] small{
+    opacity: 0.95;            /* 강제 색상 변경 없이 가독성만 보강 */
   }
 </style>
 """, unsafe_allow_html=True)
-
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
