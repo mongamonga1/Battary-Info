@@ -21,6 +21,49 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+# ── 색상만 바꾸는 경량 테마 주입(레이아웃/기능 영향 없음) ─────────────
+import streamlit as st
+
+def apply_colors(
+    page_bg="#F5F7FB",        # 본문(페이지) 배경
+    sidebar_bg="#0F172A",     # 왼쪽 메뉴바 배경
+    sidebar_text="#DBE4FF",   # 메뉴바 일반 글자
+    sidebar_link="#93C5FD"    # 메뉴바 링크/아이콘 포커스 색
+):
+    st.markdown(f"""
+    <style>
+      /* 전체 페이지 배경 */
+      .stApp {{ background: {page_bg}; }}
+
+      /* 왼쪽 사이드바 */
+      section[data-testid="stSidebar"] {{
+        background: {sidebar_bg};
+      }}
+      section[data-testid="stSidebar"] * {{
+        color: {sidebar_text} !important;
+      }}
+      section[data-testid="stSidebar"] a,
+      section[data-testid="stSidebar"] svg {{
+        color: {sidebar_link} !important;
+        fill:  {sidebar_link} !important;
+      }}
+
+      /* 메뉴 hover/선택 시 살짝 밝게 */
+      section[data-testid="stSidebar"] a:hover {{
+        background-color: rgba(255,255,255,0.08) !important;
+        border-radius: 8px;
+      }}
+    </style>
+    """, unsafe_allow_html=True)
+
+# 호출(원하는 색으로 바꾸면 됨)
+apply_colors(
+    page_bg="#F5F7FB",     # 예: 밝은 회색 배경
+    sidebar_bg="#0F172A",  # 예: 네이비 사이드바
+    sidebar_text="#DBE4FF",
+    sidebar_link="#93C5FD"
+)
+
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
