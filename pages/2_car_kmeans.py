@@ -44,36 +44,31 @@ apply_colors(
 )
 st.markdown("""
 <style>
-/* ── 사이드바 파일 업로더 드롭존만 타겟(버전별 DOM 모두 커버) ───────── */
-
-/* 1) 가장 안정적인 data-testid 기준 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"]{
-  background-color: #1E293B !important;   /* 어두운 배경 */
-  border: 1.5px dashed #94A3B8 !important;
-  border-radius: 12px !important;
-}
-
-/* 2) base 클래스 기준 (일부 버전 호환용) */
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"],
-section[data-testid="stSidebar"] .stFileUploader > div > div{
-  background-color: #1E293B !important;
-  border: 1.5px dashed #94A3B8 !important;
-  border-radius: 12px !important;
-}
-
-/* 3) 드롭존 내부 텍스트를 밝게(항상 보이게) */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *{
+/* 3) 드롭존 내부 텍스트를 밝게(항상 보이게) — 버튼은 제외 */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *:not(button):not(button *),
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *:not(button):not(button *){
   color: #EAF2FF !important;    /* 거의 흰색 */
   opacity: 1 !important;
   filter: none !important;
 }
 
-/* 4) 'Browse files' 버튼은 가독성 유지(밝은 버튼 + 진한 글자) */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button{
+/* 4) 'Browse files' 버튼(및 내부 라벨) 가독성 유지 */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button,
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button *,
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] button,
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] button *{
   background-color: #F1F5F9 !important;  /* 밝은 회색 */
   color: #0F172A !important;             /* 진한 글자 */
   font-weight: 700 !important;
+}
+
+/* (선택) 버튼 호버/포커스 */
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover{
+  background-color:#E2E8F0 !important;
+}
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:focus{
+  outline:2px solid #93C5FD !important;
+  outline-offset:2px !important;
 }
 </style>
 """, unsafe_allow_html=True)
