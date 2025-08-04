@@ -314,6 +314,8 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ───────────────────── 하단: (좌) 고객 지원 · (우) 분석 결과 ─────────────────────
+# ──────────────────────────────────────────────────────────────
+# 왼쪽: 고객지원(기존 그대로)
 c_left, c_right = st.columns([2.4, 2])
 
 with c_left:
@@ -327,10 +329,11 @@ with c_left:
     })
     st.dataframe(demo_support, use_container_width=True, height=240)
     st.markdown('</div>', unsafe_allow_html=True)
+
 # ──────────────────────────────────────────────────────────────
+# KMeans 전용: 엑셀 로더 + 차트 함수 + 오른쪽 박스 렌더링
 # 필요한 패키지
-import numpy as np
-import pandas as pd
+from pathlib import Path
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.cluster import KMeans
@@ -339,63 +342,81 @@ from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 import plotly.express as px
 
-# 한글 컬럼 → 영문 표준화(있을 때만)
+# 1) KMeans용 엑셀 로더
+KMEANS_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
+
+@st.cache_data(show_spinner=False)
+def load_kmeans_data(path: Path) -> pd.DataFrame | None:
+    if not path.exists():
+        return None
+    # 시트명이 기본이면 sheet_name=0, 다르면 이름 지정
+    dfk = pd.read_excel(path, sheet_name=0, engine="openpyxl")
+    dfk.columns = dfk.columns.str.strip()
+    return dfk
+
+df_kmeans = load_kmeans_data(KMEANS_PATH)
+
+# 2) 컬럼 표준화
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     rename_map = {
-        '사용연수(t)': 'Age',
-        'SoH_pred(%)': 'SoH',
-        '중고거래가격': 'Price',
-        '셀 간 균형': 'CellBalance',
-        '차명': 'Model'
+        # 모델명
+        '차명': 'Model', '배터리종류': 'Model', '차종': 'Model', '모델': 'Model',
+        # 수치: 사용연수/연식
+        '사용연수(t)': 'Age', '사용연수': 'Age', '연식': 'Age',
+        # 수치: SoH
+        'SoH_pred(%)': 'SoH', 'SoH(%)': 'SoH', 'SOH': 'SoH',
+        # 수치: 가격
+        '중고거래가격': 'Price', '개당가격': 'Price', '거래금액': 'Price', '가격': 'Price',
+        # 범주: 셀 균형
+        '셀 간 균형': 'CellBalance', '셀간균형': 'CellBalance',
     }
-    out = df.rename(columns={k:v for k,v in rename_map.items() if k in df.columns}).copy()
+    out = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}).copy()
     if 'CellBalance' in out.columns:
-        out['CellBalance'] = out['CellBalance'].map({'우수':'Good','경고':'Warning','심각':'Critical'}).fillna(out['CellBalance'])
+        out['CellBalance'] = (
+            out['CellBalance']
+              .map({'우수': 'Good', '경고': 'Warning', '심각': 'Critical'})
+              .fillna(out['CellBalance'])
+        )
     return out
 
 def _auto_k(X, ks):
-    # 실루엣 최고값 k (계산 안 되면 3)
     try:
         scores = []
         for k in ks:
-            if k >= len(X): break
+            if k >= len(X):
+                break
             labels = KMeans(n_clusters=k, random_state=42, n_init='auto').fit_predict(X)
             scores.append(silhouette_score(X, labels))
         return ks[int(np.argmax(scores))] if scores else 3
     except Exception:
         return 3
 
+# 3) 차명별 레이더 & 산점도 생성
 def make_model_charts(
     df: pd.DataFrame,
     model_name: str,
     k: int | str = "auto",
     reducer: str = "pca",
-    aggregate_radar: bool = False,
+    aggregate_radar: bool = True,   # 메인에는 평균 1개 레이더가 깔끔
 ):
-    """
-    df      : 원본 데이터프레임(한글/영문 컬럼 모두 허용)
-    model_name : 차명 (예: '코나 일렉트릭 (KONA ELECTRIC)' 또는 'Kona Electric')
-    k       : 군집 수 (정수 또는 'auto')
-    reducer : 'pca' (권장) / 'none'
-    aggregate_radar : True면 클러스터별 대신 '모델 평균 1개' 레이더를 그림
-    반환     : (radar_fig: go.Figure, scatter_fig: go.Figure)
-    """
     df = _normalize_columns(df)
 
-    required = {'Model','Age','SoH','Price'}
-    if not required.issubset(df.columns):
-        raise ValueError(f"데이터에 필요한 컬럼이 없습니다: {required - set(df.columns)}")
+    # 사용 가능한 수치 컬럼 자동 선택 (최소 2개 필요)
+    numeric_pool = [c for c in ['Age', 'SoH', 'Price'] if c in df.columns]
+    if 'Model' not in df.columns or len(numeric_pool) < 2:
+        missing = {'Model'} - set(df.columns)
+        raise ValueError(f"필수 컬럼 부족: {missing} + 수치 {numeric_pool}(<2).")
 
     sub = df[df['Model'].astype(str).str.contains(model_name, case=False, na=False)].copy()
     n = len(sub)
     if n < 3:
-        raise ValueError(f"'{model_name}' 데이터가 {n}건으로 너무 적습니다(≥3 필요).")
+        raise ValueError(f"'{model_name}' 데이터가 {n}건으로 너무 적습니다(≥3).")
 
-    # 전처리
-    num_cols = ['Age','SoH','Price']
+    # 전처리 파이프라인
     pre = ColumnTransformer([
-        ('num', StandardScaler(), num_cols),
-        ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'), ['CellBalance'] if 'CellBalance' in sub.columns else [])
+        ('num', StandardScaler(), numeric_pool),
+        ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'),
+         ['CellBalance'] if 'CellBalance' in sub.columns else [])
     ], remainder='drop')
 
     X = pre.fit_transform(sub)
@@ -403,107 +424,92 @@ def make_model_charts(
         X = X.toarray()
 
     # k 결정
-    if isinstance(k, str) and k == "auto":
-        ks = list(range(2, min(9, n)))  # 2~8
+    if k == "auto":
+        ks = list(range(2, min(9, n)))
         k_final = _auto_k(X, ks)
     else:
         k_final = int(k)
 
-    # KMeans 라벨
     labels = KMeans(n_clusters=k_final, random_state=42, n_init='auto').fit_predict(X)
     sub['cluster'] = labels
     clusters = sorted(sub['cluster'].unique())
 
-    # ── (1) 레이더 차트 ─────────────────────────────────────────
-    # 수치 컬럼을 0~100으로 정규화 (모델 내 기준)
+    # ── 레이더 (0~100 정규화, Age는 낮을수록 좋다고 가정해 뒤집기) ──
     scaler = MinMaxScaler(feature_range=(0, 100))
-    norm_vals = pd.DataFrame(scaler.fit_transform(sub[num_cols]), columns=num_cols, index=sub.index)
-    # 'Age'는 낮을수록 좋은 지표라고 가정 → 뒤집기(옵션)
-    norm_vals['Age'] = 100 - norm_vals['Age']
+    norm_vals = pd.DataFrame(scaler.fit_transform(sub[numeric_pool]),
+                             columns=numeric_pool, index=sub.index)
+    if 'Age' in norm_vals.columns:
+        norm_vals['Age'] = 100 - norm_vals['Age']
 
+    radar_fig = go.Figure()
     if aggregate_radar:
-        # 모델 평균 1개 폴리곤
-        avg = norm_vals.mean().reindex(num_cols).tolist()
-        radar_fig = go.Figure()
+        avg = norm_vals.mean().reindex(numeric_pool).tolist()
         radar_fig.add_trace(go.Scatterpolar(
             r=avg + [avg[0]],
-            theta=num_cols + [num_cols[0]],
-            fill='toself',
-            name=model_name
+            theta=numeric_pool + [numeric_pool[0]],
+            fill='toself', name=model_name
         ))
     else:
-        # 클러스터별 폴리곤
-        radar_fig = go.Figure()
         for c in clusters:
-            v = norm_vals.loc[sub['cluster']==c, num_cols].mean().tolist()
+            v = norm_vals.loc[sub['cluster'] == c, numeric_pool].mean().tolist()
             radar_fig.add_trace(go.Scatterpolar(
                 r=v + [v[0]],
-                theta=num_cols + [num_cols[0]],
-                fill='toself',
-                name=f'Cluster {c}'
+                theta=numeric_pool + [numeric_pool[0]],
+                fill='toself', name=f'Cluster {c}'
             ))
 
     radar_fig.update_layout(
         title=f"{model_name} : Radar",
-        polar=dict(radialaxis=dict(visible=True, range=[0,100])),
+        polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
         margin=dict(l=10, r=10, t=30, b=10),
         height=260,
         legend=dict(orientation="h", yanchor="bottom", y=-0.2)
     )
 
-    # ── (2) 산점도 (PCA 2D) ────────────────────────────────────
-    if reducer == "pca":
-        pts = PCA(n_components=2, random_state=42).fit_transform(X)
-        scatter_fig = px.scatter(
-            x=pts[:,0], y=pts[:,1],
-            color=sub['cluster'].astype(str),
-            labels={'x':'PC1','y':'PC2','color':'Cluster'},
-            title=f"{model_name} : Cluster Scatter (PCA 2D)",
-            height=280
-        )
-    else:
-        scatter_fig = px.scatter(
-            x=np.arange(n), y=np.zeros(n),
-            color=sub['cluster'].astype(str),
-            labels={'x':'index','y':'','color':'Cluster'},
-            title=f"{model_name} : Clusters",
-            height=280
-        )
-
-    scatter_fig.update_layout(margin=dict(l=10,r=10,t=30,b=10))
+    # ── 산점도 (PCA 2D) ──
+    pts = PCA(n_components=2, random_state=42).fit_transform(X) if reducer == "pca" else \
+          np.c_[np.arange(n), np.zeros(n)]
+    scatter_fig = px.scatter(
+        x=pts[:, 0], y=pts[:, 1],
+        color=sub['cluster'].astype(str),
+        labels={'x': 'PC1' if reducer == "pca" else 'index',
+                'y': 'PC2' if reducer == "pca" else '',
+                'color': 'Cluster'},
+        title=f"{model_name} : Cluster Scatter ({'PCA 2D' if reducer=='pca' else 'index'})",
+        height=280
+    )
+    scatter_fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
     return radar_fig, scatter_fig
-# ──────────────────────────────────────────────────────────────
 
+# 4) 오른쪽 박스 렌더링
 with c_right:
     st.markdown('<div class="box"><div class="box-title">📌 차명별 군집 결과</div>', unsafe_allow_html=True)
 
-    # '차명' 또는 'Model' 컬럼 자동 감지
-    model_col = '차명' if '차명' in df.columns else ('Model' if 'Model' in df.columns else None)
-
-    if model_col:
-        models = sorted(df[model_col].dropna().astype(str).unique())
-        # 상단 드롭다운(숨김 라벨)
-        pick = st.selectbox("차종 선택", models, index=0 if models else None, label_visibility="collapsed")
-
-        if pick:
-            try:
-                radar_fig, scatter_fig = make_model_charts(
-                    df,
-                    model_name=str(pick),  # 선택한 차종
-                    k="auto",              # 군집 수 자동 결정
-                    reducer="pca",
-                    aggregate_radar=True   # 평균 1개 레이더; 클러스터별이면 False
-                )
-                st.plotly_chart(radar_fig, use_container_width=True, config={"displayModeBar": False})
-                st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
-            except Exception as e:
-                st.warning(str(e))
+    if df_kmeans is None:
+        st.info("KMeans용 엑셀을 찾을 수 없습니다. `data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx` 를 넣어주세요.")
     else:
-        st.info("데이터에 '차명' 또는 'Model' 컬럼이 없어 차종을 선택할 수 없습니다.")
+        # 차명 컬럼 탐지 (정규화 함수에서도 한 번 더 표준화됨)
+        model_col = '차명' if '차명' in df_kmeans.columns else ('Model' if 'Model' in df_kmeans.columns else None)
+        if model_col is None:
+            st.warning("엑셀에 '차명' 또는 'Model' 컬럼이 없습니다.")
+        else:
+            models = sorted(df_kmeans[model_col].dropna().astype(str).unique())
+            pick = st.selectbox("차종 선택", models, index=0 if models else None, label_visibility="collapsed")
+            if pick:
+                try:
+                    radar_fig, scatter_fig = make_model_charts(
+                        df_kmeans,                # ← 엑셀 데이터 사용
+                        model_name=str(pick),
+                        k="auto",
+                        reducer="pca",
+                        aggregate_radar=True
+                    )
+                    st.plotly_chart(radar_fig, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
+                except Exception as e:
+                    st.warning(str(e))
 
     st.markdown('</div>', unsafe_allow_html=True)
-# ──────────────────────────────────────────────────────────────
-
 
 # ───────────────────── 데이터 미리보기 ─────────────────────
 st.markdown('<div class="blank"></div>', unsafe_allow_html=True)
