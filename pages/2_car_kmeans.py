@@ -562,7 +562,6 @@ from openai import OpenAI
 import streamlit as st
 
 api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-st.write("키 존재:", bool(api_key))
 if api_key:
     try:
         client = OpenAI(api_key=api_key)
