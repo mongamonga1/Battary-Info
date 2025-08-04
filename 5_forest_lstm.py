@@ -207,7 +207,7 @@ def make_sequences(arr, seq_len):
     idx = np.arange(seq_len)[None, :] + np.arange(len(arr) - seq_len + 1)[:, None]
     return arr[idx]
 
-# ----------------------------- 4) CSV 로드 (캐시 + PyArrow 폴백) -----------------------------
+# ----------------------------- 4) CSV 로드 (캐시 + PyArrow 안전 폴백) -----------------------------
 DATA_PATH = Path("data/통합거래내역.csv")
 
 def _file_sig(path: Path):
@@ -219,20 +219,35 @@ def _file_sig(path: Path):
 
 @st.cache_data(show_spinner=False)
 def read_csv_fast(path: Path, encoding="utf-8-sig", arrow=True, memory_map=True, low_memory=False):
+    """
+    - 먼저 pyarrow 엔진 시도(가능하면 가장 빠름)
+      · 이때는 pandas 버전에 따라 지원 인자가 다르므로 최소 인자만 전달
+      · dtype_backend='pyarrow'도 pandas 2.x에서만 가능 → 실패 시 재시도
+    - 실패하면 pandas 기본 엔진으로 폴백
+    """
     _ = _file_sig(path)  # 파일 변경 시 캐시 무효화 키
-    engine = None
+
+    # 1) pyarrow 엔진 우선 시도 (있을 때만)
     if arrow:
         try:
             import pyarrow  # noqa: F401
-            engine = "pyarrow"
+            # (a) pandas 2.x에서만 동작하는 경로
+            try:
+                return pd.read_csv(path, engine="pyarrow", encoding=encoding, dtype_backend="pyarrow")
+            except TypeError:
+                # (b) dtype_backend 미지원 → 최소 인자만
+                return pd.read_csv(path, engine="pyarrow", encoding=encoding)
         except Exception:
-            engine = None
-    kw = dict(encoding=encoding, memory_map=memory_map, low_memory=low_memory)
-    if engine:
-        kw["engine"] = engine
-        # pandas>=2.0에서만 활성. 가능 시 메모리/속도 이점
-        kw["dtype_backend"] = "pyarrow"
-    return pd.read_csv(path, **kw)
+            # pyarrow 미설치/미지원 → 아래 기본 엔진 폴백
+            pass
+
+    # 2) 기본 엔진 폴백
+    try:
+        # pandas C 엔진에서는 memory_map/low_memory가 유효
+        return pd.read_csv(path, encoding=encoding, memory_map=memory_map, low_memory=low_memory)
+    except TypeError:
+        # 환경에 따라 일부 인자 미지원 시 최소 인자로 재시도
+        return pd.read_csv(path, encoding=encoding)
 
 df = read_csv_fast(DATA_PATH)
 # st.write(f"읽은 파일: {DATA_PATH.name}, shape={df.shape}")
