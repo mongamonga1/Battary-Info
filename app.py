@@ -267,7 +267,7 @@ with right:
     st.markdown('<div class="box"><div class="box-title">🚨 이상거래 의심 내역</div>', unsafe_allow_html=True)
     if "개당가격" in df.columns:
         df2 = df.sort_values("계약일").copy()
-        df2["변동"] = df2["개당가격"].pct_change().fillna(0)
+        df2["변동"] = pd.to_numeric(df2["개당가격"], errors="coerce").pct_change(fill_method=None).fillna(0)
         label_col = next((c for c in ["배터리종류", "모델", "차종", "판매업체"] if c in df2.columns), df2.columns[0])
         top_issue = (df2.tail(40)
                         .nlargest(6, "변동")
