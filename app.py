@@ -559,6 +559,7 @@ current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ts], position="h
 
 # ───────────────────── 사이드바(공통) ─────────────────────
 with st.sidebar:
+    # 상단 브랜드 영역(그대로 유지)
     st.markdown(
         '<div style="position:sticky;top:0;z-index:10;background:#0f1b2d;padding:12px 12px 6px;'
         'margin:0 -8px 8px -8px;border-bottom:1px solid rgba(255,255,255,.06);">'
@@ -566,12 +567,16 @@ with st.sidebar:
         "</div>",
         unsafe_allow_html=True,
     )
-    st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
-    # Page 객체에 직접 연결
-    st.page_link(pg_kmeans, label="군집 분석", icon="🚗")
-    st.page_link(pg_reco, label="기업 추천", icon="✨")
-    st.page_link(pg_fraud, label="이상거래 의심", icon="🌳")
-    st.page_link(pg_ts, label="시세 분석", icon="📈")
+
+    # ⬇️ 메인 화면으로 가는 링크(요거 추가)
+    st.page_link(home, label="메인 화면", icon="🏠")
+
+    # 상세 페이지들은 접히는 그룹으로
+    with st.expander("분석 결과 확인", expanded=True):
+        st.page_link(pg_kmeans, label="군집 분석", icon="🚗")
+        st.page_link(pg_reco,   label="기업 추천", icon="✨")
+        st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
+        st.page_link(pg_ts,     label="시세 분석", icon="📈")
 
 # ───────────────────── 선택된 페이지 실행 (필수) ─────────────────────
 current.run()
