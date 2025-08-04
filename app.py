@@ -559,7 +559,7 @@ current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ts], position="h
 
 # ───────────────────── 사이드바(공통) ─────────────────────
 with st.sidebar:
-    # 상단 브랜드 영역(그대로 유지)
+    # 브랜드 영역
     st.markdown(
         '<div style="position:sticky;top:0;z-index:10;background:#0f1b2d;padding:12px 12px 6px;'
         'margin:0 -8px 8px -8px;border-bottom:1px solid rgba(255,255,255,.06);">'
@@ -568,15 +568,20 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # ⬇️ 메인 화면으로 가는 링크(요거 추가)
+    # 1) 메인 화면
     st.page_link(home, label="메인 화면", icon="🏠")
 
-    # 상세 페이지들은 접히는 그룹으로
+    # 간격
+    st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+
+    # 2) 분석 결과 확인(군집/기업/시세만)
     with st.expander("분석 결과 확인", expanded=True):
         st.page_link(pg_kmeans, label="군집 분석", icon="🚗")
         st.page_link(pg_reco,   label="기업 추천", icon="✨")
-        st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
         st.page_link(pg_ts,     label="시세 분석", icon="📈")
+
+    # 3) 이상거래 의심 — 그룹 밖에 단독 배치
+    st.page_link(pg_fraud, label="이상거래 의심", icon="🌳")
 
 st.markdown(
     """
