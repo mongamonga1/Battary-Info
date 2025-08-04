@@ -311,7 +311,7 @@ if show_profiles:
     st.markdown("<div class='caption-center'>추가 프로파일도 가로 스크롤로 확인하세요.</div>", unsafe_allow_html=True)
 
 # ───────────────────── GPT 요약 (Chat Completions) & Word 내보내기 ─────────────────────
-st.subheader("🧠 GPT 분석결과 & Word 내보내기")
+st.subheader("🧠 믿:음 분석결과 & Word 내보내기")
 
 # 세션 상태 저장
 if "ai_text" not in st.session_state:
