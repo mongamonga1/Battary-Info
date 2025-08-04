@@ -63,18 +63,9 @@ apply_colors(
     sidebar_text="#DBE4FF",
     sidebar_link="#93C5FD"
 )
-import streamlit as st
 
-nav = st.navigation({
-    "": [
-        st.Page("app.py", title="🏠 메인 대시보드"),
-        st.Page("pages/2_car_kmeans.py", title="🚗 차명별 군집분석"),
-        st.Page("pages/4_recommend_system.py", title="🧠 기업 추"),
-        st.Page("pages/5_forest_lstm.py", title="🌲 이상거래 의"),
-        st.Page("pages/5_timeseries_analysis.py", title="📈 시세 분석"),
-    ]
-})
-nav.run()
+st.page_link("app.py", label="🏠 홈으로", icon="🏠")
+st.divider()
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
