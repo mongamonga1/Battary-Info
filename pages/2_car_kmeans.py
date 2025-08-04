@@ -38,9 +38,9 @@ def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF"
 
 apply_colors(
     page_bg="#F5F7FB",
-    sidebar_bg="#0F172A",
-    sidebar_text="#00000",    # ← 순백으로 진하게
-    sidebar_link="#93C5FD"
+    sidebar_bg="#FFFFFF",   # 밝은 배경
+    sidebar_text="#111827", # 검은색 계열(매우 진함)
+    sidebar_link="#1F2937"  # 포커스/아이콘도 진한 회색
 )
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
