@@ -23,6 +23,33 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
+# --- OpenAI secrets 헬퍼: [openai] 섹션/단일 키/환경변수 모두 지원 ---
+def get_openai_conf():
+    """
+    반환: (api_key:str|None, model_name:str|None)
+    - Streamlit Secrets의 [openai].api_key / [openai].model 우선
+    - OPENAI_API_KEY(단일 키)도 허용
+    - 환경변수 OPENAI_API_KEY 도 마지막 보루
+    """
+    api_key = None
+    model_name = None
+
+    # 1) [openai] 섹션
+    if hasattr(st, "secrets") and "openai" in st.secrets:
+        sect = st.secrets["openai"]
+        api_key = sect.get("api_key") or api_key
+        model_name = sect.get("model") or model_name
+
+    # 2) 단일 키도 허용
+    if hasattr(st, "secrets"):
+        api_key = api_key or st.secrets.get("OPENAI_API_KEY")
+
+    # 3) 환경변수
+    import os
+    api_key = api_key or os.environ.get("OPENAI_API_KEY")
+
+    return api_key, model_name
+
 # ── 선택 라이브러리(있으면 활용: 덴드로그램/엘보우)
 try:
     from scipy.cluster.hierarchy import linkage
@@ -136,10 +163,19 @@ show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", val
 
 # 💸 비용 옵션 (최소 과금 구조)
 st.sidebar.markdown("### 💸 비용 옵션")
-cost_saver    = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
-MODEL_NAME    = "gpt-4o-mini"  # 저가 모델 고정
-MAX_TOKENS    = 320 if cost_saver else 600   # 응답 토큰 상한
-TEMPERATURE   = 0.2
+cost_saver = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
+DEFAULT_MODEL = "gpt-4o-mini"
+
+# Secrets/환경변수에서 키·모델 읽기
+_api_key, _model_from_secret = get_openai_conf()
+MODEL_NAME = _model_from_secret or DEFAULT_MODEL
+MAX_TOKENS = 320 if cost_saver else 600
+
+# 상태 표시(선택)
+if _api_key:
+    st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
+else:
+    st.sidebar.warning("🔒 OPENAI_API_KEY 미설정 → 로컬 요약으로 대체")
 
 # ───────────────────── 모델 데이터 준비 ─────────────────────
 sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
@@ -336,26 +372,26 @@ def generate_ai_summary(model: str,
                         model_name: str,
                         max_tokens: int,
                         temperature: float) -> str:
-    """저가 모델 + 짧은 프롬프트/응답으로 비용 최소화"""
     stats_compact = summarize_compact(dfm, num_pool)
     try:
         if not _has_openai:
             raise RuntimeError("openai 패키지가 설치되어 있지 않습니다.")
 
-        # ── 키 로드(하드코딩 금지)
-        if hasattr(st, "secrets") and "OPENAI_API_KEY" in st.secrets:
-            api_key = st.secrets["OPENAI_API_KEY"]
-        else:
-            api_key = os.environ.get("OPENAI_API_KEY")
+        # ← 여기! 통합 헬퍼로 가져옴
+        api_key, model_from_secret = get_openai_conf()
+        # secrets에 모델명이 있으면 덮어씀
+        if model_from_secret:
+            model_name = model_from_secret
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY not set")
 
+        from openai import OpenAI
         client = OpenAI(api_key=api_key)
 
         system_msg = (
             "You are a concise Korean data analyst. "
             "군집분석 결과를 250~350자 한국어 본문으로 요약하라. "
-            "군집별 (연식·SoH·가격) 비교와 실무 활용 포인트 2~3개를 포함. "
+            "군집별 (연식·SoH·가격) 비교와 실무 활용 포인트 2~3개 포함. "
             "불필요한 표/이모지/목록은 지양."
         )
         user_prompt = (
@@ -366,7 +402,7 @@ def generate_ai_summary(model: str,
         )
 
         resp = client.chat.completions.create(
-            model=model_name,             # 예: "gpt-4o-mini"
+            model=model_name,            # 예: gpt-4o-mini
             messages=[
                 {"role": "system", "content": system_msg},
                 {"role": "user",   "content": user_prompt},
@@ -376,8 +412,8 @@ def generate_ai_summary(model: str,
         )
         return resp.choices[0].message.content.strip()
 
-    except Exception:
-        # 키 미설정/오류 시 로컬 요약 폴백(비용 0원)
+    except Exception as e:
+        # 실패 시 로컬 요약(비용 0원)
         cluster_means = dfm.groupby("cluster")[num_pool].mean().round(1)
         top_price = cluster_means["Price"].idxmax() if "Price" in cluster_means.columns else "—"
         return (
