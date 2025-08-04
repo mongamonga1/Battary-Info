@@ -222,14 +222,6 @@ show_pca3     = st.sidebar.checkbox("PCA 3D 추가", value=False)
 perplexity    = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
 show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", value=True)
 
-# ── 사이드바: 메인으로 이동 버튼 (이 파일 상단의 다른 코드들 아래 아무 곳에 추가)
-with st.sidebar:
-    st.markdown("---")  # 구분선 (선택)
-    if st.button("🏠 메인 화면으로", use_container_width=True):
-        # 앱의 엔트리 파일명이 app.py가 맞다면 그대로 두세요.
-        # 다른 이름이면 해당 파일명으로 바꾸세요 (예: "Home.py").
-        st.switch_page("app.py")
-
 # 💸 비용 옵션 (최소 과금 구조)
 st.sidebar.markdown("### 💸 비용 옵션")
 cost_saver   = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
