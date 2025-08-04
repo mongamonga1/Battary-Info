@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 from pathlib import Path                       # 🔸 추가
+import streamlit as st
 
 # PyTorch (LSTM용) 사용 가능 여부
 try:
@@ -351,8 +352,6 @@ def combine_scores(a, b):
     return max(0.6*a, 0.4*b)
 
 df_feat["final_score"] = [combine_scores(a, b) for a, b in zip(df_feat["if_score_norm"], df_feat["lstm_score_norm"])]
-
-import streamlit as st
 import plotly.express as px
 
 # ───────────────────── 10) Plotly 시각화 ─────────────────────
