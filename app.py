@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Home · Main page (시안형)
-좌측 pages/... 로 이동하기 전, 개요·통계·미리보기를 제공하는 대시보드.
-- 상단 요약 카드 4개
-- 중앙: (좌) 시세/트렌드 라인차트  (우) 이상거래 의심 내역
-- 하단: (좌) 고객 지원 테이블  (우) 분석 결과(레이더+막대)
+Home · Main page (방법B 적용)
+- 기본 Streamlit Pages 내비게이션/검색 숨김
+- 사이드바에 커스텀 메뉴(st.page_link) 배치
+- 시안형 대시보드 레이아웃
 """
 from __future__ import annotations
 
@@ -24,43 +23,50 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ───────────────────── 공통 스타일(CSS) ─────────────────────
-with st.sidebar:
-    st.header("🗂 메뉴")
-    st.caption("아래 페이지에서 상세 분석을 확인하세요.")
-    st.markdown("- car kmeans  \n- recommend system  \n- forest lstm  \n- timeseries analysis")
-    st.divider()
-    up = st.file_uploader("CSV 업로드(미리보기용)", type="csv")
-    if up:
-        tmp_df = pd.read_csv(up, nrows=100)
-        st.success("업로드 파일 미리보기 (100행)")
-        st.dataframe(tmp_df, use_container_width=True)
-        
+# ───────────────────── 기본 Pages 내비/검색 숨기기 ─────────────────────
 st.markdown(
     """
     <style>
-      /* 전체 배경 톤 & 카드 그림자 */
+      /* Streamlit 기본 Pages 내비게이션(검색 + 목록) 완전히 숨김 */
+      [data-testid="stSidebarNav"] { display: none !important; }
+      nav[aria-label="Pages"] { display: none !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ───────────────────── 공통 스타일(CSS) ─────────────────────
+st.markdown(
+    """
+    <style>
       .app-container { background: #f6f8fb; }
       [data-testid="stAppViewContainer"] { background: #f6f8fb; }
       [data-testid="stHeader"] { background: rgba(246,248,251,0.7); backdrop-filter: blur(6px); }
       [data-testid="stSidebar"] { background: #0f1b2d; color: #d7e1f2; }
       [data-testid="stSidebar"] * { font-weight: 500; }
-      /* 요약 카드 */
+
+      /* 커스텀 메뉴(우리 손으로 만든 링크) */
+      .menu-link {
+        display:flex; align-items:center; gap:.5rem;
+        padding:10px 12px; margin:4px 0; border-radius:10px;
+        color:#e6efff; text-decoration:none; font-weight:600;
+      }
+      .menu-link:hover { background:#13233b; color:#fff; }
+      .menu-section-title { color:#cfe0ff; font-weight:800; letter-spacing:.2px; }
+
+      /* 카드 공통 */
       .kpi-card {
         border-radius: 14px; padding: 16px 18px; background: #fff;
-        box-shadow: 0 2px 14px rgba(16,24,40,0.06); border: 1px solid #eef2f7;
-        height: 100%;
+        box-shadow: 0 2px 14px rgba(16,24,40,0.06); border: 1px solid #eef2f7; height: 100%;
       }
       .kpi-title { font-size: 13px; color:#7a8aa0; margin-bottom: 6px; display:flex; gap:8px; align-items:center;}
       .kpi-value { font-size: 26px; font-weight: 700; }
-      .kpi-sub   { font-size: 12px; color:#9aa8ba; }
       .kpi-trend-up { color:#10b981; font-weight:700; }
       .kpi-trend-down { color:#ef4444; font-weight:700; }
-      /* 박스 헤더 */
+
       .box { background:#fff; border:1px solid #eef2f7; border-radius:14px; padding:14px; box-shadow:0 2px 14px rgba(16,24,40,.06); }
       .box-title { font-weight:700; color:#0f172a; display:flex; align-items:center; gap:10px; }
       .muted { color:#8a99ad; font-size:13px; }
-      /* 테이블 헤더 라운딩 */
       .blank { height:6px; }
     </style>
     """,
@@ -89,73 +95,43 @@ def load_data(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
     df = pd.read_csv(path)
-    # 컬럼 공백 제거 & 날짜·가격 정제
     df.columns = df.columns.str.strip()
     if "계약일" in df.columns:
         df["계약일"] = pd.to_datetime(df["계약일"], errors="coerce")
     if "개당가격" in df.columns:
         df["개당가격"] = (
-            df["개당가격"]
-              .astype(str)
-              .str.replace(r"[^\d.\-]", "", regex=True)
-              .pipe(pd.to_numeric, errors="coerce")
+            df["개당가격"].astype(str)
+            .str.replace(r"[^\d.\-]", "", regex=True)
+            .pipe(pd.to_numeric, errors="coerce")
         )
     return df
 
 df = load_data(DATA_PATH)
 
-# ───────────────────── 사이드바 안내 ─────────────────────
-st.markdown(
-    """
-    <style>
-      /* 상단 세부메뉴 컨테이너 여백 */
-      [data-testid="stSidebarNav"] { padding-top: 6px; }
+# ───────────────────── 사이드바: 커스텀 메뉴(방법B) ─────────────────────
+with st.sidebar:
+    st.markdown("### 📂 메뉴", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
+    # ⚠️ 실제 파일명으로 경로를 맞추세요. 예: 'pages/01_car kmeans.py'
+    st.page_link("pages/car kmeans.py",           label="car kmeans",          icon="🚗")
+    st.page_link("pages/recommend system.py",     label="recommend system",    icon="✨")
+    st.page_link("pages/forest lstm.py",          label="forest lstm",         icon="🌳")
+    st.page_link("pages/timeseries analysis.py",  label="timeseries analysis", icon="📈")
 
-      /* 메뉴 항목 텍스트/간격/호버 */
-      [data-testid="stSidebarNav"] ul { padding-left: .25rem; }
-      [data-testid="stSidebarNav"] li a {
-        color: #e6efff !important;          /* 밝은 글자색 */
-        background: transparent !important;
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-weight: 600;
-      }
-      [data-testid="stSidebarNav"] li a:hover {
-        background: #13233b !important;     /* 호버 배경 */
-        color: #ffffff !important;
-      }
-      /* 현재 선택된 페이지 강조 */
-      [data-testid="stSidebarNav"] li a[aria-current="page"] {
-        background: #1c2e4a !important;
-        color: #ffffff !important;
-        box-shadow: inset 0 0 0 1px #273b5c;
-      }
+    st.divider()
+    st.caption("CSV 업로드(미리보기용)")
+    up = st.file_uploader(" ", type="csv")
+    if up:
+        tmp_df = pd.read_csv(up, nrows=100)
+        st.success("업로드 파일 미리보기 (100행)")
+        st.dataframe(tmp_df, use_container_width=True)
 
-      /* 상단 검색 입력창(placeholder 포함) */
-      [data-testid="stSidebarNav"] [data-baseweb="input"]>div {
-        background:#0b1626 !important;
-        border:1px solid #2a3a54 !important;
-      }
-      [data-testid="stSidebarNav"] input {
-        color:#e6efff !important;
-      }
-      [data-testid="stSidebarNav"] input::placeholder {
-        color:#93a4bf !important;
-      }
-
-      /* 접힘 아이콘/구분선 색 */
-      [data-testid="stSidebarNav"] svg { color:#b7c6e0; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ───────────────────── 데이터 유무 경고 ─────────────────────
+# ───────────────────── 데이터 유무 방어 ─────────────────────
 if df is None or ("계약일" not in df.columns):
     st.warning(
         "`data/통합거래내역.csv`가 없거나 **계약일** 컬럼이 없습니다. "
         "레포의 **data/** 폴더에 CSV를 두면 요약/차트가 채워집니다."
     )
+    # 데모 데이터
     df = pd.DataFrame({
         "계약일": pd.date_range(end=today, periods=120, freq="D"),
         "계약번호": [f"T{i:05d}" for i in range(120)],
@@ -165,10 +141,10 @@ if df is None or ("계약일" not in df.columns):
         "개당가격": np.random.randint(1200000, 2600000, 120)
     })
 
-# ───────────────────── 상단 요약 카드 ─────────────────────
+# ───────────────────── 상단 KPI 카드 ─────────────────────
 total_cnt = len(df)
-seller_n  = df["판매업체"].nunique() if "판매업체" in df.columns else None
-buyer_n   = df["구매업체"].nunique() if "구매업체" in df.columns else None
+seller_n  = df["판매업체"].nunique() if "판매업체" in df.columns else 0
+buyer_n   = df["구매업체"].nunique() if "구매업체" in df.columns else 0
 period_txt = f"{pd.to_datetime(df['계약일']).min().date()} ↔ {pd.to_datetime(df['계약일']).max().date()}"
 
 c1, c2, c3, c4 = st.columns(4)
@@ -207,7 +183,7 @@ with c4:
         f"""
         <div class="kpi-card">
           <div class="kpi-title">📈 현황</div>
-          <div class="kpi-value">{seller_n or 0:,} / {buyer_n or 0:,}</div>
+          <div class="kpi-value">{seller_n:,} / {buyer_n:,}</div>
           <div class="muted">관측 기간: {period_txt}</div>
         </div>
         """, unsafe_allow_html=True
@@ -220,7 +196,6 @@ left, right = st.columns([4, 1.8])
 
 with left:
     st.markdown('<div class="box"><div class="box-title">📉 시세 / 트렌드</div>', unsafe_allow_html=True)
-    # 월별 건수 추이
     monthly_cnt = (
         pd.to_datetime(df["계약일"])
           .to_frame(name="계약일")
@@ -237,12 +212,9 @@ with left:
 
 with right:
     st.markdown('<div class="box"><div class="box-title">🚨 이상거래 의심 내역</div>', unsafe_allow_html=True)
-
-    # 단순 규칙: 가격 증감률 상/하위 아이템을 리스트업(없으면 임의 생성)
     if "개당가격" in df.columns:
         df2 = df.sort_values("계약일").copy()
         df2["변동"] = df2["개당가격"].pct_change().fillna(0)
-        # 대표 라벨: 배터리종류/모델/판매업체 중 있는 것 사용
         label_col = next((c for c in ["배터리종류", "모델", "차종", "판매업체"] if c in df2.columns), df2.columns[0])
         top_issue = (df2.tail(40)
                         .nlargest(6, "변동")
@@ -290,28 +262,23 @@ with c_left:
 
 with c_right:
     st.markdown('<div class="box"><div class="box-title">📌 Kona 주요 분석 결과</div>', unsafe_allow_html=True)
-
-    # (1) 레이더 차트 — 임의 지표 5개
     metrics = ["안전성", "효율", "잔존수명", "온도안정", "전압균형"]
     radar_vals = np.clip(np.random.normal(loc=[70,65,68,72,66], scale=6), 40, 95)
     radar = go.Figure(
-        data=[
-            go.Scatterpolar(r=radar_vals.tolist()+[radar_vals[0]], theta=metrics+metrics[:1],
-                            fill='toself', name="Kona")
-        ],
-        layout=go.Layout(margin=dict(l=10,r=10,t=10,b=10), height=250, polar=dict(radialaxis=dict(visible=True, range=[0,100])))
+        data=[go.Scatterpolar(r=radar_vals.tolist()+[radar_vals[0]], theta=metrics+metrics[:1],
+                              fill='toself', name="Kona")],
+        layout=go.Layout(margin=dict(l=10,r=10,t=10,b=10), height=250,
+                         polar=dict(radialaxis=dict(visible=True, range=[0,100])))
     )
     st.plotly_chart(radar, use_container_width=True, config={"displayModeBar": False})
 
-    # (2) 막대 차트 — 배터리종류 상위 카운트
     if "배터리종류" in df.columns:
-        top_batt = (df["배터리종류"].value_counts().head(6).reset_index())
+        top_batt = df["배터리종류"].value_counts().head(6).reset_index()
         top_batt.columns = ["배터리종류", "count"]
         bar = px.bar(top_batt, x="배터리종류", y="count")
         bar.update_layout(margin=dict(l=10,r=10,t=10,b=10), height=260)
         st.plotly_chart(bar, use_container_width=True, config={"displayModeBar": False})
     else:
-        st.info("`배터리종류` 컬럼이 없어 기본 예시 막대를 표시합니다.")
         demo = pd.DataFrame({"배터리종류": list("ABCDEF"), "count": [9,7,6,5,4,3]})
         st.plotly_chart(px.bar(demo, x="배터리종류", y="count"), use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
@@ -321,4 +288,4 @@ st.markdown('<div class="blank"></div>', unsafe_allow_html=True)
 with st.expander("데이터 미리보기 (앞 50행)"):
     st.dataframe(df.head(50), use_container_width=True)
 
-st.caption("© 2025 Battery-Info ― 사이드바에서 상세 분석 페이지를 탐색하세요.")
+st.caption("© 2025 Battery-Info ― 사이드바 커스텀 메뉴에서 상세 분석 페이지로 이동하세요.")
