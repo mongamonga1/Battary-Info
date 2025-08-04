@@ -44,19 +44,23 @@ apply_colors(
 )
 st.markdown("""
 <style>
-  /* ⛳ 파일 업로더(흰 배경) 안의 모든 텍스트를 진한 색으로 강제 */
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"],
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] *,
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] span,
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] p,
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] small,
-  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] label {
-    color: #0F172A !important;   /* 아주 진한 남색 = 거의 검정 */
-    opacity: 1 !important;
-    filter: none !important;
+  /* 파일 업로더 드롭존: 배경/글자색을 강제로 재설정 */
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"]{
+    background:#FFFFFF !important;
+    color:#111827 !important;      /* 기본 글자색(거의 검정) */
+  }
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] *{
+    color:#111827 !important;      /* 내부 모든 텍스트 */
+    opacity:1 !important;
+    filter:none !important;
+  }
+  /* 혹시 아이콘(SVG)이 흰색이면 */
+  section[data-testid="stSidebar"] div[data-testid="stFileUploadDropzone"] svg{
+    fill:#111827 !important;
   }
 </style>
 """, unsafe_allow_html=True)
+
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
