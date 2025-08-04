@@ -94,16 +94,50 @@ def load_data(path: Path) -> pd.DataFrame | None:
 df = load_data(DATA_PATH)
 
 # ───────────────────── 사이드바 안내 ─────────────────────
-with st.sidebar:
-    st.header("🗂 메뉴")
-    st.caption("아래 페이지에서 상세 분석을 확인하세요.")
-    st.markdown("- car kmeans  \n- recommend system  \n- forest lstm  \n- timeseries analysis")
-    st.divider()
-    up = st.file_uploader("CSV 업로드(미리보기용)", type="csv")
-    if up:
-        tmp_df = pd.read_csv(up, nrows=100)
-        st.success("업로드 파일 미리보기 (100행)")
-        st.dataframe(tmp_df, use_container_width=True)
+st.markdown(
+    """
+    <style>
+      /* 상단 세부메뉴 컨테이너 여백 */
+      [data-testid="stSidebarNav"] { padding-top: 6px; }
+
+      /* 메뉴 항목 텍스트/간격/호버 */
+      [data-testid="stSidebarNav"] ul { padding-left: .25rem; }
+      [data-testid="stSidebarNav"] li a {
+        color: #e6efff !important;          /* 밝은 글자색 */
+        background: transparent !important;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-weight: 600;
+      }
+      [data-testid="stSidebarNav"] li a:hover {
+        background: #13233b !important;     /* 호버 배경 */
+        color: #ffffff !important;
+      }
+      /* 현재 선택된 페이지 강조 */
+      [data-testid="stSidebarNav"] li a[aria-current="page"] {
+        background: #1c2e4a !important;
+        color: #ffffff !important;
+        box-shadow: inset 0 0 0 1px #273b5c;
+      }
+
+      /* 상단 검색 입력창(placeholder 포함) */
+      [data-testid="stSidebarNav"] [data-baseweb="input"]>div {
+        background:#0b1626 !important;
+        border:1px solid #2a3a54 !important;
+      }
+      [data-testid="stSidebarNav"] input {
+        color:#e6efff !important;
+      }
+      [data-testid="stSidebarNav"] input::placeholder {
+        color:#93a4bf !important;
+      }
+
+      /* 접힘 아이콘/구분선 색 */
+      [data-testid="stSidebarNav"] svg { color:#b7c6e0; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ───────────────────── 데이터 유무 경고 ─────────────────────
 if df is None or ("계약일" not in df.columns):
