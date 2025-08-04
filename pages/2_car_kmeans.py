@@ -534,19 +534,18 @@ if gen_btn:
         TEMPLATE_PATH = Path("data/EV_Battery_Report_Full.docx")  # 있으면 스타일 상속, 없으면 무시
         template_to_use = TEMPLATE_PATH if TEMPLATE_PATH.exists() else None
 
-        word_buf = export_word(
-            doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
-            model=choice,
-            gpt_analysis_text=ai_text,
-            main_imgs=main_images,
-            profile_imgs=profile_images if show_profiles else [],
-            dfm=sub_all,
-            num_pool=num_pool,
-            votes=votes,
-            k_final=k_final,
-            template_path=template_to_use,
-            font_name="Malgun Gothic"
-        )
+        word_buf = export_word_like_full(
+    doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
+    model=choice,
+    gpt_analysis_text=ai_text,                  # GPT 요약(한글)
+    main_imgs=main_images,
+    profile_imgs=profile_images if show_profiles else [],
+    dfm=sub_all,
+    num_pool=num_pool,
+    votes=votes,
+    k_final=k_final,
+    font_name="Malgun Gothic"                   # 한글 폰트
+)
 
     st.success("보고서를 생성했습니다.")
     st.download_button(
