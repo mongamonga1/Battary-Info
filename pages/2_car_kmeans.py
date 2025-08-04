@@ -38,10 +38,28 @@ def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF"
 
 apply_colors(
     page_bg="#F5F7FB",
-    sidebar_bg="#FFFFFF",   # 밝은 배경
-    sidebar_text="#111827", # 검은색 계열(매우 진함)
-    sidebar_link="#1F2937"  # 포커스/아이콘도 진한 회색
+    sidebar_bg="#0F172A",
+    sidebar_text="#FFFFFF",
+    sidebar_link="#93C5FD"
 )
+st.markdown("""
+<style>
+  /* 사이드바 안에서 '흰 배경'을 쓰는 위젯들의 텍스트 색 강화 */
+  section[data-testid="stSidebar"] input,
+  section[data-testid="stSidebar"] textarea,
+  section[data-testid="stSidebar"] [data-baseweb="select"] *,
+  section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *,
+  section[data-testid="stSidebar"] .stDownloadButton > button span {
+    color: #111827 !important;   /* 아주 진한 회색(검정에 가까움) */
+  }
+
+  /* 플레이스홀더(연한 글자)도 조금 진하게 */
+  section[data-testid="stSidebar"] ::placeholder {
+    color: #374151 !important;   /* slate-700 */
+    opacity: 1 !important;
+  }
+</style>
+""", unsafe_allow_html=True)
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
