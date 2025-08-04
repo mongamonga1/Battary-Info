@@ -28,7 +28,7 @@ st.markdown("""
   [data-testid="stSidebarNav"] a,
   [data-testid="stSidebarNav"] p,
   [data-testid="stSidebarNav"] span {
-    color: #eaf2ff !important;   /* 밝은 글자색 */
+    color: #fffff !important;   /* 밝은 글자색 */
     opacity: 1 !important;       /* 흐림 제거 */
     filter: none !important;     /* 혹시 적용된 투명/블러 제거 */
   }
