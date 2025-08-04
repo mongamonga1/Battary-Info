@@ -45,30 +45,24 @@ apply_colors(
 st.markdown("""
 <style>
 /* 3) 드롭존 내부 텍스트를 밝게(항상 보이게) — 버튼은 제외 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *:not(button):not(button *),
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *:not(button):not(button *){
-  color: #EAF2FF !important;    /* 거의 흰색 */
-  opacity: 1 !important;
-  filter: none !important;
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] *:not(button):not([role="button"]):not([data-baseweb="button"]):not(button *):not([role="button"] *):not([data-baseweb="button"] *),
+section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] *:not(button):not([role="button"]):not([data-baseweb="button"]):not(button *):not([role="button"] *):not([data-baseweb="button"] *){
+  color:#EAF2FF !important;
+  opacity:1 !important;
+  filter:none !important;
 }
 
-/* 4) 'Browse files' 버튼(및 내부 라벨) 가독성 유지 */
+/* 4) 업로더 '버튼'(및 내부 라벨) 색상 강제 */
 section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button,
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [role="button"],
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"],
 section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button *,
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] button,
-section[data-testid="stSidebar"] .stFileUploader [data-testid="stFileUploadDropzone"] button *{
-  background-color: #F1F5F9 !important;  /* 밝은 회색 */
-  color: #0F172A !important;             /* 진한 글자 */
-  font-weight: 700 !important;
-}
-
-/* (선택) 버튼 호버/포커스 */
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:hover{
-  background-color:#E2E8F0 !important;
-}
-section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] button:focus{
-  outline:2px solid #93C5FD !important;
-  outline-offset:2px !important;
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [role="button"] *,
+section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] [data-baseweb="button"] *{
+  background-color:#F1F5F9 !important;
+  color:#0F172A !important;
+  font-weight:700 !important;
+  opacity:1 !important;
 }
 </style>
 """, unsafe_allow_html=True)
