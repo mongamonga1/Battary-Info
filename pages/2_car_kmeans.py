@@ -517,3 +517,22 @@ if gen_btn:
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         use_container_width=True,
     )
+
+import os
+from openai import OpenAI
+import streamlit as st
+
+api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+st.write("키 존재:", bool(api_key))
+if api_key:
+    try:
+        client = OpenAI(api_key=api_key)
+        r = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role":"user", "content":"한 줄로 대답: 연결 테스트 성공 여부만 말해줘."}],
+            max_tokens=10,
+            temperature=0.0,
+        )
+        st.success("응답: " + r.choices[0].message.content)
+    except Exception as e:
+        st.error(f"API 호출 실패: {e}")
