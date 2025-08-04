@@ -162,7 +162,7 @@ df = load_data(DATA_PATH)
 st.markdown('<div class="brand-wrap"><div class="brand">BATTERY-INFO</div></div>', unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("### 📂 메뉴", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
+    st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
     # ⚠️ 실제 파일명으로 경로를 맞추세요. 예: 'pages/01_car kmeans.py'
     st.page_link("pages/2_car_kmeans.py",           label="군집 분석",          icon="🚗")
     st.page_link("pages/4_recommend_system.py",     label="기업 추천",    icon="✨")
