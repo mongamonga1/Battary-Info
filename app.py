@@ -330,7 +330,8 @@ with c_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
-# KMeans 전용: 엑셀 로더 + 컬럼 표준화 + 차트 함수 + 렌더링
+# ──────────────────────────────────────────────────────────────
+# KMeans 전용: 엑셀 로더 + 컬럼 표준화 + (k 자동결정: Sil/Elbow/Dendr) + 차트 + 렌더링
 
 # 필요한 패키지 (중복 import 되어도 무방)
 import numpy as np
@@ -343,6 +344,20 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 import plotly.express as px
+
+# 덴드로그램용(필수 아님) - 설치 안 되어 있으면 자동 우회
+try:
+    from scipy.cluster.hierarchy import linkage
+    _has_scipy = True
+except Exception:
+    _has_scipy = False
+
+# Yellowbrick(선택) - 설치 안 되어 있으면 자동 우회
+try:
+    from yellowbrick.cluster import KElbowVisualizer  # noqa
+    _has_yb = True
+except Exception:
+    _has_yb = False
 
 # 1) 엑셀 로더
 KMEANS_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
@@ -367,7 +382,7 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
                 return c
         return None
 
-    # 표준 컬럼명 매핑을 구성합니다.
+    # 표준 컬럼명 매핑
     mapping = {}
     schema = [
         ("Model",       ["차명", "배터리종류", "차종", "모델"]),
@@ -410,22 +425,77 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     return out
 
-def _auto_k(X, ks):
-    try:
-        scores = []
-        for k in ks:
-            if k >= len(X): break
-            labels = KMeans(n_clusters=k, random_state=42, n_init='auto').fit_predict(X)
-            scores.append(silhouette_score(X, labels))
-        return ks[int(np.argmax(scores))] if scores else 3
-    except Exception:
-        return 3
+# 3) k 자동결정: 실루엣·엘보우(관성)·덴드로그램 gap → 중앙값
+def _choose_k_multi(X: np.ndarray, ks: list[int], max_dendro_samples: int = 200):
+    results = {}
 
-# 3) 차명별 레이더 + 산점도
+    # 1) Silhouette
+    try:
+        sil_scores = []
+        for k in ks:
+            if k >= len(X):
+                break
+            labels = KMeans(n_clusters=k, random_state=42, n_init='auto').fit_predict(X)
+            sil_scores.append(silhouette_score(X, labels))
+        if sil_scores:
+            k_sil = ks[int(np.argmax(sil_scores))]
+            results['silhouette'] = k_sil
+    except Exception:
+        pass
+
+    # 2) Elbow (Inertia) - 가장 큰 기울기 감소 지점
+    try:
+        inertias = [KMeans(n_clusters=k, random_state=42, n_init='auto').fit(X).inertia_ for k in ks]
+        if len(inertias) >= 2:
+            diffs = np.diff(inertias)
+            k_elbow = ks[int(np.argmax(diffs)) + 1]  # +1: diff의 인덱스를 k로 환산
+            results['elbow'] = k_elbow
+    except Exception:
+        pass
+
+    # 3) Dendrogram gap (Ward) - 가장 큰 거리 증가 지점
+    try:
+        if _has_scipy:
+            n = X.shape[0]
+            idx = np.arange(n)
+            if n > max_dendro_samples:
+                idx = np.random.choice(n, max_dendro_samples, replace=False)
+            Z = linkage(X[idx], method='ward')
+            dists = Z[:, 2]
+            gaps = np.diff(dists)
+            if len(gaps) >= 1:
+                # 원본 코드와 동일한 변환
+                k_dend = max(2, min(n - (int(np.argmax(gaps)) + 1), ks[-1]))
+                results['dendrogram'] = k_dend
+    except Exception:
+        pass
+
+    # 4) Yellowbrick (설치된 경우만; 참고용) — 최종 median 계산에는 포함 X
+    try:
+        if _has_yb:
+            # silhouette 기준으로 elbow_value_를 얻을 수 있지만,
+            # 그림 렌더는 생략(서버 환경에서 GUI 없음 가정)
+            pass
+    except Exception:
+        pass
+
+    # 최종 선택: Sil/Elbow/Dend 중 존재하는 값들의 중앙값
+    votes = [results.get('silhouette'), results.get('elbow'), results.get('dendrogram')]
+    votes = [v for v in votes if v is not None]
+    if not votes:
+        # 모든 방법 실패 시 안전한 기본값
+        return {'k_final': 3, 'detail': results}
+
+    k_final = int(np.median(votes))
+    results['k_final'] = k_final
+    results['detail'] = results.copy()
+    return results
+
+# 4) 차명별 레이더 + 산점도
 def make_model_charts(
     df: pd.DataFrame,
     model_name: str,
-    k: int | str = "auto",
+    k: int | str = "auto",     # "auto" → 위의 멀티 방식 사용
     reducer: str = "pca",
     aggregate_radar: bool = True,   # 메인에는 평균 1개 레이더가 깔끔
 ):
@@ -462,11 +532,14 @@ def make_model_charts(
         X = X.toarray()
 
     # k 결정
-    if k == "auto":
-        ks = list(range(2, min(9, len(sub))))
-        k_final = _auto_k(X, ks)
+    if isinstance(k, str) and k == "auto":
+        ks = list(range(2, min(10, len(sub))))  # 2 ~ 9 (또는 최대 n-1)
+        choose = _choose_k_multi(X, ks)
+        k_final = int(choose['k_final'])
+        k_detail = choose['detail'] if 'detail' in choose else {}
     else:
         k_final = int(k)
+        k_detail = {}
 
     labels = KMeans(n_clusters=k_final, random_state=42, n_init='auto').fit_predict(X)
     sub['cluster'] = labels
@@ -519,9 +592,10 @@ def make_model_charts(
     )
     scatter_fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
 
-    return radar_fig, scatter_fig
+    # k 상세 표시는 반환값에 함께 넘겨 Streamlit에서 캡션으로 쓸 수 있게 함
+    return radar_fig, scatter_fig, k_final, k_detail
 
-# 4) 오른쪽 박스 렌더링
+# 5) 오른쪽 박스 렌더링
 with c_right:
     st.markdown('<div class="box"><div class="box-title">📌 차명별 군집 결과</div>', unsafe_allow_html=True)
 
@@ -537,7 +611,7 @@ with c_right:
             pick = st.selectbox("차종 선택", models, index=0 if models else None, label_visibility="collapsed")
             if pick:
                 try:
-                    radar_fig, scatter_fig = make_model_charts(
+                    radar_fig, scatter_fig, k_final, k_detail = make_model_charts(
                         df_kmeans,                # ← 엑셀 데이터 사용
                         model_name=str(pick),
                         k="auto",
@@ -546,10 +620,19 @@ with c_right:
                     )
                     st.plotly_chart(radar_fig, use_container_width=True, config={"displayModeBar": False})
                     st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
+
+                    # k 선정 근거 캡션
+                    det = k_detail
+                    sil = det.get('silhouette', '—')
+                    elb = det.get('elbow', '—')
+                    den = det.get('dendrogram', '—')
+                    st.caption(f"선택된 k = {k_final} (Sil={sil}, Elbow={elb}, Dend={den} → median).")
+
                 except Exception as e:
                     st.warning(str(e))
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 # ───────────────────── 데이터 미리보기 ─────────────────────
 st.markdown('<div class="blank"></div>', unsafe_allow_html=True)
 with st.expander("데이터 미리보기 (앞 50행)"):
