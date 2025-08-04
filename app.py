@@ -314,8 +314,7 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ───────────────────── 하단: (좌) 고객 지원 · (우) 분석 결과 ─────────────────────
-# ──────────────────────────────────────────────────────────────
-# 왼쪽: 고객지원(기존 그대로)
+# 레이아웃: 왼쪽 고객지원 · 오른쪽 KMeans 결과
 c_left, c_right = st.columns([2.4, 2])
 
 with c_left:
@@ -331,8 +330,11 @@ with c_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
-# KMeans 전용: 엑셀 로더 + 차트 함수 + 오른쪽 박스 렌더링
-# 필요한 패키지
+# KMeans 전용: 엑셀 로더 + 컬럼 표준화 + 차트 함수 + 렌더링
+
+# 필요한 패키지 (중복 import 되어도 무방)
+import numpy as np
+import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
@@ -342,56 +344,75 @@ from sklearn.decomposition import PCA
 import plotly.graph_objects as go
 import plotly.express as px
 
-# 1) KMeans용 엑셀 로더
+# 1) 엑셀 로더
 KMEANS_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
 
 @st.cache_data(show_spinner=False)
 def load_kmeans_data(path: Path) -> pd.DataFrame | None:
     if not path.exists():
         return None
-    # 시트명이 기본이면 sheet_name=0, 다르면 이름 지정
     dfk = pd.read_excel(path, sheet_name=0, engine="openpyxl")
-    dfk.columns = dfk.columns.str.strip()
+    dfk.columns = dfk.columns.map(lambda x: str(x).strip())
     return dfk
 
 df_kmeans = load_kmeans_data(KMEANS_PATH)
 
-# 2) 컬럼 표준화
+# 2) 컬럼 표준화(중복 방지 + 숫자/범주 정리)
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    rename_map = {
-        # 모델명
-        '차명': 'Model', '배터리종류': 'Model', '차종': 'Model', '모델': 'Model',
-        # 수치: 사용연수/연식
-        '사용연수(t)': 'Age', '사용연수': 'Age', '연식': 'Age',
-        # 수치: SoH
-        'SoH_pred(%)': 'SoH', 'SoH(%)': 'SoH', 'SOH': 'SoH',
-        # 수치: 가격
-        '중고거래가격': 'Price', '개당가격': 'Price', '거래금액': 'Price', '가격': 'Price',
-        # 범주: 셀 균형
-        '셀 간 균형': 'CellBalance', '셀간균형': 'CellBalance',
-    }
-    out = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns}).copy()
+    out = df.copy()
+
+    def pick_first(candidates):
+        for c in candidates:
+            if c in out.columns:
+                return c
+        return None
+
+    mapping = {}
+    c = pick_first(['차명', '배터리종류', '차종', '모델']);                 if c: mapping[c] = 'Model'
+    c = pick_first(['사용연수(t)', '사용연수', '연식']);                    if c: mapping[c] = 'Age'
+    c = pick_first(['SoH_pred(%)', 'SoH(%)', 'SOH']);                    if c: mapping[c] = 'SoH'
+    c = pick_first(['중고거래가격', '개당가격', '거래금액', '가격']);         if c: mapping[c] = 'Price'
+    c = pick_first(['셀 간 균형', '셀간균형']);                           if c: mapping[c] = 'CellBalance'
+
+    out = out.rename(columns=mapping)
+
+    # 같은 이름으로 합쳐졌을 수 있으므로 중복 열 제거(첫 번째만 유지)
+    if out.columns.duplicated().any():
+        out = out.loc[:, ~out.columns.duplicated()]
+
+    # 범주 매핑(정상 추가)
     if 'CellBalance' in out.columns:
         out['CellBalance'] = (
             out['CellBalance']
-              .map({'우수': 'Good', '경고': 'Warning', '심각': 'Critical'})
-              .fillna(out['CellBalance'])
+            .map({'우수': 'Good', '정상': 'Normal', '경고': 'Warning', '심각': 'Critical'})
+            .fillna(out['CellBalance'])
         )
+
+    # 숫자 정리(문자/기호 제거 후 숫자화)
+    if 'Price' in out.columns:
+        out['Price'] = (
+            out['Price'].astype(str).str.replace(r'[^\d.\-]', '', regex=True)
+                        .pipe(pd.to_numeric, errors='coerce')
+        )
+    if 'Age' in out.columns:
+        out['Age'] = pd.to_numeric(out['Age'], errors='coerce')
+    if 'SoH' in out.columns:
+        out['SoH'] = pd.to_numeric(out['SoH'], errors='coerce')
+
     return out
 
 def _auto_k(X, ks):
     try:
         scores = []
         for k in ks:
-            if k >= len(X):
-                break
+            if k >= len(X): break
             labels = KMeans(n_clusters=k, random_state=42, n_init='auto').fit_predict(X)
             scores.append(silhouette_score(X, labels))
         return ks[int(np.argmax(scores))] if scores else 3
     except Exception:
         return 3
 
-# 3) 차명별 레이더 & 산점도 생성
+# 3) 차명별 레이더 + 산점도
 def make_model_charts(
     df: pd.DataFrame,
     model_name: str,
@@ -401,16 +422,24 @@ def make_model_charts(
 ):
     df = _normalize_columns(df)
 
-    # 사용 가능한 수치 컬럼 자동 선택 (최소 2개 필요)
-    numeric_pool = [c for c in ['Age', 'SoH', 'Price'] if c in df.columns]
-    if 'Model' not in df.columns or len(numeric_pool) < 2:
-        missing = {'Model'} - set(df.columns)
-        raise ValueError(f"필수 컬럼 부족: {missing} + 수치 {numeric_pool}(<2).")
+    # 필수 컬럼 체크
+    if 'Model' not in df.columns:
+        raise ValueError("필수 컬럼 'Model'이 없습니다.")
 
+    # 사용 가능한 수치 컬럼(최소 2개 필요)
+    numeric_pool = [c for c in ['Age', 'SoH', 'Price'] if c in df.columns]
+    if len(numeric_pool) < 2:
+        raise ValueError(f"수치 컬럼이 부족합니다(필요≥2): {numeric_pool}")
+
+    # 모델 필터 + 수치 결측 제거
     sub = df[df['Model'].astype(str).str.contains(model_name, case=False, na=False)].copy()
-    n = len(sub)
-    if n < 3:
-        raise ValueError(f"'{model_name}' 데이터가 {n}건으로 너무 적습니다(≥3).")
+    sub = sub.dropna(subset=numeric_pool)
+    if sub.empty or len(sub) < 3:
+        raise ValueError(f"'{model_name}' 유효 데이터가 {len(sub)}건입니다(≥3 필요).")
+
+    # 혹시 모를 중복 열 제거
+    if sub.columns.duplicated().any():
+        sub = sub.loc[:, ~sub.columns.duplicated()]
 
     # 전처리 파이프라인
     pre = ColumnTransformer([
@@ -425,7 +454,7 @@ def make_model_charts(
 
     # k 결정
     if k == "auto":
-        ks = list(range(2, min(9, n)))
+        ks = list(range(2, min(9, len(sub))))
         k_final = _auto_k(X, ks)
     else:
         k_final = int(k)
@@ -434,7 +463,7 @@ def make_model_charts(
     sub['cluster'] = labels
     clusters = sorted(sub['cluster'].unique())
 
-    # ── 레이더 (0~100 정규화, Age는 낮을수록 좋다고 가정해 뒤집기) ──
+    # ── 레이더(0~100 정규화, Age는 낮을수록 좋다고 가정해 뒤집기) ──
     scaler = MinMaxScaler(feature_range=(0, 100))
     norm_vals = pd.DataFrame(scaler.fit_transform(sub[numeric_pool]),
                              columns=numeric_pool, index=sub.index)
@@ -457,7 +486,6 @@ def make_model_charts(
                 theta=numeric_pool + [numeric_pool[0]],
                 fill='toself', name=f'Cluster {c}'
             ))
-
     radar_fig.update_layout(
         title=f"{model_name} : Radar",
         polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
@@ -466,19 +494,22 @@ def make_model_charts(
         legend=dict(orientation="h", yanchor="bottom", y=-0.2)
     )
 
-    # ── 산점도 (PCA 2D) ──
-    pts = PCA(n_components=2, random_state=42).fit_transform(X) if reducer == "pca" else \
-          np.c_[np.arange(n), np.zeros(n)]
+    # ── 산점도(PCA 2D) ──
+    if reducer == "pca":
+        pts = PCA(n_components=2, random_state=42).fit_transform(X)
+        xlab, ylab = 'PC1', 'PC2'
+    else:
+        pts = np.c_[np.arange(len(sub)), np.zeros(len(sub))]
+        xlab, ylab = 'index', ''
     scatter_fig = px.scatter(
         x=pts[:, 0], y=pts[:, 1],
         color=sub['cluster'].astype(str),
-        labels={'x': 'PC1' if reducer == "pca" else 'index',
-                'y': 'PC2' if reducer == "pca" else '',
-                'color': 'Cluster'},
+        labels={'x': xlab, 'y': ylab, 'color': 'Cluster'},
         title=f"{model_name} : Cluster Scatter ({'PCA 2D' if reducer=='pca' else 'index'})",
         height=280
     )
     scatter_fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+
     return radar_fig, scatter_fig
 
 # 4) 오른쪽 박스 렌더링
@@ -488,7 +519,7 @@ with c_right:
     if df_kmeans is None:
         st.info("KMeans용 엑셀을 찾을 수 없습니다. `data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx` 를 넣어주세요.")
     else:
-        # 차명 컬럼 탐지 (정규화 함수에서도 한 번 더 표준화됨)
+        # '차명' 또는 'Model' 감지(정규화 함수에서도 한 번 더 보정됨)
         model_col = '차명' if '차명' in df_kmeans.columns else ('Model' if 'Model' in df_kmeans.columns else None)
         if model_col is None:
             st.warning("엑셀에 '차명' 또는 'Model' 컬럼이 없습니다.")
@@ -510,7 +541,6 @@ with c_right:
                     st.warning(str(e))
 
     st.markdown('</div>', unsafe_allow_html=True)
-
 # ───────────────────── 데이터 미리보기 ─────────────────────
 st.markdown('<div class="blank"></div>', unsafe_allow_html=True)
 with st.expander("데이터 미리보기 (앞 50행)"):
