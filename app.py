@@ -22,6 +22,27 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+st.markdown("""
+<style>
+  /* 목록(링크/텍스트) 색상만 밝게, 흐림 제거 */
+  [data-testid="stSidebarNav"] a,
+  [data-testid="stSidebarNav"] p,
+  [data-testid="stSidebarNav"] span {
+    color: #eaf2ff !important;   /* 밝은 글자색 */
+    opacity: 1 !important;       /* 흐림 제거 */
+    filter: none !important;     /* 혹시 적용된 투명/블러 제거 */
+  }
+
+  /* 상단 검색창 글자/placeholder 만 밝게 */
+  [data-testid="stSidebarNav"] input {
+    color: #eaf2ff !important;
+  }
+  [data-testid="stSidebarNav"] input::placeholder {
+    color: #9fb2cf !important;
+    opacity: 1 !important;
+  }
+</style>
+""", unsafe_allow_html=True)
 
 # ───────────────────── 기본 Pages 내비/검색 숨기기 ─────────────────────
 st.markdown(
