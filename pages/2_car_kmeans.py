@@ -171,6 +171,9 @@ _api_key, _model_from_secret = get_openai_conf()
 MODEL_NAME = _model_from_secret or DEFAULT_MODEL
 MAX_TOKENS = 320 if cost_saver else 600
 
+TEMPERATURE = st.sidebar.slider("요약 temperature", 0.0, 1.0, 0.2, 0.05)
+MAX_TOKENS  = 320 if cost_saver else 600
+
 # 상태 표시(선택)
 if _api_key:
     st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
