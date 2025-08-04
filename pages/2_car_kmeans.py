@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""차명별 K-means 군집 분석 (통합 버전: k 자동선정 + 다양한 시각화)"""
+"""차명별 K-means 군집 분석 (k 자동선정, 결과 그래프 가로 배치)"""
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -21,9 +21,9 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-# SciPy(덴드로그램) / Yellowbrick(엘보우) 선택 사용
+# SciPy(덴드로그램) / Yellowbrick(엘보우) 설치 여부만 확인 → 계산에만 사용(표시는 안 함)
 try:
-    from scipy.cluster.hierarchy import linkage, dendrogram
+    from scipy.cluster.hierarchy import linkage
     _has_scipy = True
 except Exception:
     _has_scipy = False
@@ -38,7 +38,7 @@ except Exception:
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["axes.unicode_minus"] = False
 
-st.header("🚗 차명별 K-means 군집 분석 (통합)")
+st.header("🚗 차명별 K-means 군집 분석")
 
 # ───────────────────────── 데이터 로드 ─────────────────────────
 DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
@@ -88,7 +88,7 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     if out.columns.duplicated().any():
         out = out.loc[:, ~out.columns.duplicated()]
 
-    # 범주 매핑(정상 추가)
+    # 범주 매핑
     if "CellBalance" in out.columns:
         out["CellBalance"] = (
             out["CellBalance"]
@@ -128,9 +128,10 @@ models = sorted(df["Model"].dropna().astype(str).unique())
 choice = st.sidebar.selectbox("차명 선택", models)
 
 show_profiles = st.sidebar.checkbox("추가 프로파일(박스/바이올린/히트맵/레이더)", value=True)
-show_pca3 = st.sidebar.checkbox("PCA 3D 표시", value=False)
-show_tsne = st.sidebar.checkbox("t-SNE 2D/3D 표시", value=False)
-perplexity = st.sidebar.slider("t-SNE perplexity", min_value=5, max_value=50, value=30, step=1)
+show_pca3     = st.sidebar.checkbox("PCA 3D 표시 (별도)", value=False)
+show_tsne     = st.sidebar.checkbox("t-SNE 2D 표시", value=True)   # 기본 켬
+perplexity    = st.sidebar.slider("t-SNE perplexity", min_value=5, max_value=50, value=30, step=1)
+cols_per_row  = st.sidebar.slider("결과 그래프 가로 배치 수", 2, 3, 3)
 
 # 후보 k 범위
 sub_all = df[df["Model"].astype(str) == str(choice)].copy()
@@ -173,7 +174,6 @@ def choose_k_multi(X, ks):
     # 2) Elbow(Inertia)
     try:
         if _has_yb:
-            # Yellowbrick로 elbow 찾기(왜곡/관성 기준 중 택1)
             viz = KElbowVisualizer(KMeans(random_state=42), k=ks, metric="distortion", timings=False)
             viz.fit(X)
             k_elbow = int(viz.elbow_value_) if viz.elbow_value_ is not None else None
@@ -188,13 +188,13 @@ def choose_k_multi(X, ks):
         k_elbow = None
 
     # 3) Dendrogram gap
-    k_dend = None
     try:
         if _has_scipy:
             n = X.shape[0]
             idx = np.arange(n)
             if n > 200:
                 idx = np.random.choice(n, 200, replace=False)
+            from scipy.cluster.hierarchy import linkage  # 재확인
             Z = linkage(X[idx], method="ward")
             dists = Z[:, 2]
             gaps = np.diff(dists)
@@ -208,64 +208,74 @@ def choose_k_multi(X, ks):
     # 최종 k = 존재하는 값들의 중앙값
     vals = [v for v in [votes.get("silhouette"), votes.get("elbow"), votes.get("dendrogram")] if v is not None]
     k_final = int(np.median(vals)) if vals else 3
-    return k_final, votes, sil_scores, (locals().get("k_elbow", None)), k_dend
+    return k_final, votes
 
-k_final, votes, sil_scores, k_elbow_used, k_dend_used = choose_k_multi(X, ks)
+k_final, votes = choose_k_multi(X, ks)
 
 st.caption(f"선택된 k = {k_final} (Sil={votes.get('silhouette','—')}, "
            f"Elbow={votes.get('elbow','—')}, Dend={votes.get('dendrogram','—')} → median)")
 
-# ───────────────────────── 모델 학습 & 라벨 ─────────────────────────
+# ───────────────────────── 학습 & 라벨 ─────────────────────────
 labels = KMeans(n_clusters=k_final, random_state=42, n_init="auto").fit_predict(X)
 sub_all = sub_all.copy()
 sub_all["cluster"] = labels
 clusters = sorted(sub_all["cluster"].unique())
 palette = cycle(sns.color_palette("tab10"))
 
-# ───────────────────────── 진단 플롯(선택) ─────────────────────────
-# 실루엣 곡선
-if sil_scores is not None:
-    fig = plt.figure(figsize=(5, 3))
-    plt.plot(ks, sil_scores, "-o", label="Silhouette")
-    plt.axvline(k_final, color="green", linestyle="--", label=f"Final k={k_final}")
-    plt.title(f"{choice}: Silhouette Scores")
-    plt.xlabel("k"); plt.ylabel("Avg Silhouette"); plt.grid(True); plt.legend()
-    st.pyplot(fig)
+# ───────────────────────── 결과 그래프(가로 배치) ─────────────────────────
+result_figs = []
 
-# 엘보우 곡선
-try:
-    inertias = [KMeans(n_clusters=k, random_state=42, n_init="auto").fit(X).inertia_ for k in ks]
-    fig = plt.figure(figsize=(5, 3))
-    plt.plot(ks, inertias, "-o", label="Inertia")
-    plt.axvline(k_final, color="green", linestyle="--", label=f"Final k={k_final}")
-    plt.title(f"{choice}: Elbow (Inertia)")
-    plt.xlabel("k"); plt.ylabel("Inertia"); plt.grid(True); plt.legend()
-    st.pyplot(fig)
-except Exception:
-    pass
-
-# 덴드로그램
-if _has_scipy:
-    nX = X.shape[0]
-    idx = np.arange(nX)
-    if nX > 200:
-        idx = np.random.choice(nX, 200, replace=False)
-    Z = linkage(X[idx], method="ward")
-    fig = plt.figure(figsize=(6, 3))
-    dendrogram(Z, truncate_mode="lastp", p=10, show_leaf_counts=True)
-    plt.title(f"{choice}: Dendrogram")
-    plt.xlabel("Cluster merges"); plt.ylabel("Distance"); plt.tight_layout()
-    st.pyplot(fig)
-
-# ───────────────────────── 핵심 시각화 ─────────────────────────
-# PCA 2D
+# 1) PCA 2D
 p2 = PCA(2, random_state=42).fit_transform(X)
-fig = plt.figure(figsize=(5, 4))
-plt.scatter(p2[:, 0], p2[:, 1], c=labels, cmap="tab10", s=60, edgecolors="k", alpha=0.85)
-plt.title(f"{choice}: PCA 2D (k={k_final})"); plt.xlabel("PC1"); plt.ylabel("PC2")
-st.pyplot(fig)
+fig_pca = plt.figure(figsize=(4.6, 3.8))
+plt.scatter(p2[:, 0], p2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+plt.title(f"{choice}: PCA 2D (k={k_final})")
+plt.xlabel("PC1"); plt.ylabel("PC2"); plt.tight_layout()
+result_figs.append(("PCA 2D", fig_pca))
 
-# PCA 3D (옵션)
+# 2) t-SNE 2D (옵션)
+if show_tsne:
+    perp = min(perplexity, n - 1)
+    ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
+    fig_ts2 = plt.figure(figsize=(4.6, 3.8))
+    plt.scatter(ts2[:, 0], ts2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+    plt.title(f"{choice}: t-SNE 2D (k={k_final})")
+    plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
+    result_figs.append(("t-SNE 2D", fig_ts2))
+
+# 3) Radar(클러스터 평균, 0~1 정규화)
+mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
+norm_means = mean_matrix.copy()
+for c in num_pool:
+    mn, mx = df[c].min(), df[c].max()
+    if pd.notna(mn) and pd.notna(mx) and mx != mn:
+        norm_means[c] = (norm_means[c] - mn) / (mx - mn)
+    else:
+        norm_means[c] = 0.5  # 안전값
+
+angles = [i / len(num_pool) * 2 * pi for i in range(len(num_pool))] + [0]
+fig_radar = plt.figure(figsize=(4.6, 3.8))
+ax = plt.subplot(111, polar=True)
+for i in clusters:
+    vals = norm_means.loc[i].tolist()
+    vals.append(vals[0])
+    ax.plot(angles, vals, label=f"Cluster {i}")
+    ax.fill(angles, vals, alpha=0.1)
+ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
+plt.title(f"{choice}: Radar (k={k_final})")
+plt.legend(loc="upper right", bbox_to_anchor=(1.25, 1.05))
+result_figs.append(("Radar", fig_radar))
+
+# 가로(타일) 배치 출력
+cols = st.columns(cols_per_row)
+for i, (_, fig) in enumerate(result_figs):
+    with cols[i % cols_per_row]:
+        st.pyplot(fig, use_container_width=True)
+    # 줄바꿈
+    if (i + 1) % cols_per_row == 0 and (i + 1) < len(result_figs):
+        cols = st.columns(cols_per_row)
+
+# (선택) PCA 3D는 별도 아래에 단독 표시
 if show_pca3:
     p3 = PCA(3, random_state=42).fit_transform(X)
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
@@ -276,25 +286,7 @@ if show_pca3:
     ax3.set_xlabel("PC1"); ax3.set_ylabel("PC2"); ax3.set_zlabel("PC3")
     st.pyplot(fig3)
 
-# t-SNE (옵션)
-if show_tsne:
-    perp = min(perplexity, n - 1)
-    ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
-    fig_ts2 = plt.figure(figsize=(5, 4))
-    plt.scatter(ts2[:, 0], ts2[:, 1], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
-    plt.title(f"{choice}: t-SNE 2D (k={k_final})"); plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2")
-    st.pyplot(fig_ts2)
-
-    if show_pca3:
-        ts3 = TSNE(n_components=3, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
-        fig_ts3 = plt.figure(figsize=(6, 5))
-        ax_ts3 = fig_ts3.add_subplot(111, projection="3d")
-        ax_ts3.scatter(ts3[:, 0], ts3[:, 1], ts3[:, 2], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
-        ax_ts3.set_title(f"{choice}: t-SNE 3D (k={k_final})")
-        ax_ts3.set_xlabel("t-SNE1"); ax_ts3.set_ylabel("t-SNE2"); ax_ts3.set_zlabel("t-SNE3")
-        st.pyplot(fig_ts3)
-
-# ───────────────────────── 추가 프로파일(옵션) ─────────────────────────
+# ───────────────────────── 추가 프로파일(옵션, 세로) ─────────────────────────
 if show_profiles:
     # Box & Violin
     for col in num_pool:
@@ -330,28 +322,6 @@ if show_profiles:
     plt.title(f"{choice}: Numeric Feature Means per Cluster")
     st.pyplot(fig)
 
-    # Radar (각 클러스터 평균, 0~1 정규화 후 표시)
-    norm_means = mean_matrix.copy()
-    for c in num_pool:
-        mn, mx = df[c].min(), df[c].max()
-        if pd.notna(mn) and pd.notna(mx) and mx != mn:
-            norm_means[c] = (norm_means[c] - mn) / (mx - mn)
-        else:
-            norm_means[c] = 0.5  # 안전값
-
-    angles = [i / len(num_pool) * 2 * pi for i in range(len(num_pool))] + [0]
-    fig = plt.figure(figsize=(6, 6))
-    ax = plt.subplot(111, polar=True)
-    for i in clusters:
-        vals = norm_means.loc[i].tolist()
-        vals.append(vals[0])
-        ax.plot(angles, vals, label=f"Cluster {i}")
-        ax.fill(angles, vals, alpha=0.1)
-    ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
-    plt.title(f"{choice}: Radar Chart of Cluster Profiles")
-    plt.legend(loc="upper right", bbox_to_anchor=(1.25, 1.1))
-    st.pyplot(fig)
-
     # 통계 표
     stats = sub_all.groupby("cluster")[num_pool].agg(["count", "mean", "std", "min", "max", "median"])
     st.subheader("클러스터 통계 요약")
@@ -365,7 +335,6 @@ if show_profiles:
         ctab_pct = pd.crosstab(sub_all["cluster"], sub_all["CellBalance"], normalize="index") * 100
         ctab_pct = ctab_pct.reindex(clusters, fill_value=0)
     for i in clusters:
-        dom = None
         if "CellBalance" in sub_all.columns and not ctab_pct.loc[i].empty:
             dom = ctab_pct.loc[i].idxmax()
             dom_val = ctab_pct.loc[i].max()
