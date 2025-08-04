@@ -29,7 +29,7 @@ ROOT = Path(__file__).parent
 PAGES = {
     "kmeans": ROOT / "pages/2_car_kmeans.py",
     "reco": ROOT / "pages/4_recommend_system.py",
-    "fraud": ROOT / "pages/5_forest_lstm.py",
+    "fraud": ROOT / "5_forest_lstm.py",
     "timeseries": ROOT / "pages/5_timeseries_analysis.py",
 }
 
