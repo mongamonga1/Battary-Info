@@ -253,7 +253,7 @@ with left:
         pd.to_datetime(df["계약일"])
           .to_frame(name="계약일")
           .set_index("계약일")
-          .resample("M")
+          .resample("ME")
           .size()
           .rename("count")
           .reset_index()
