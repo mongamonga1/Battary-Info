@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Home · Main page (방법B 적용)
-- 기본 Streamlit Pages 내비게이션/검색 숨김
-- 사이드바에 커스텀 메뉴(st.page_link) 배치
-- 시안형 대시보드 레이아웃
+Home · Main page (방법B 적용·수정)
+- Streamlit Cloud에서 st.page_link KeyError('url_pathname') 회피
+- st.navigation으로 페이지를 등록(position="hidden"), 사이드바는 커스텀 링크 사용
+- 경로 안전화(ROOT 기준), set_page_config 최상단으로 이동
 """
+
 from __future__ import annotations
 
 import streamlit as st
@@ -15,21 +16,6 @@ from datetime import datetime
 import plotly.express as px
 import plotly.graph_objects as go
 
-import streamlit as st
-from pathlib import Path
-
-# (선택) 경로 존재 가드 – 오타/실행 루트 문제 조기 탐지
-assert Path("pages/2_car_kmeans.py").exists(), "pages/2_car_kmeans.py 없음"
-assert Path("pages/4_recommend_system.py").exists(), "pages/4_recommend_system.py 없음"
-assert Path("pages/5_forest_lstm.py").exists(), "pages/5_forest_lstm.py 없음"
-assert Path("pages/5_timeseries_analysis.py").exists(), "pages/5_timeseries_analysis.py 없음"
-
-# 문자열 경로 대신 Page 객체 생성 (방법B에서도 사용 가능)
-pg_kmeans = st.Page("pages/2_car_kmeans.py",          title="🚗 차명별 군집분석")
-pg_reco   = st.Page("pages/4_recommend_system.py",    title="✨ 기업 추천")
-pg_fraud  = st.Page("pages/5_forest_lstm.py",         title="🌳 이상거래 의심")
-pg_ts     = st.Page("pages/5_timeseries_analysis.py", title="📈 시세 분석")
-
 # ───────────────────── 페이지 기본 설정 ─────────────────────
 st.set_page_config(
     page_title="배터리 데이터 분석 허브",
@@ -37,50 +23,69 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-# 사이드바 상단 브랜드(크게) + 고정
+
+# ───────────────────── 경로/페이지 등록 ─────────────────────
+ROOT = Path(__file__).parent
+
+# pages/ 존재 및 대상 파일 확인(경고만 띄우고 계속 진행)
+PAGES = {
+    "kmeans": ROOT / "pages/2_car_kmeans.py",
+    "reco": ROOT / "pages/4_recommend_system.py",
+    "fraud": ROOT / "pages/5_forest_lstm.py",
+    "timeseries": ROOT / "pages/5_timeseries_analysis.py",
+}
+missing = [str(p.relative_to(ROOT)) for p in PAGES.values() if not p.exists()]
+if missing:
+    st.sidebar.warning(
+        "다음 페이지 파일을 찾지 못했습니다:\n- " + "\n- ".join(missing)
+    )
+
+# Page 객체 등록(내비는 숨김). 여기서 URL 경로가 안정적으로 생성됩니다.
+home      = st.Page(__file__,                            title="🏠 홈", default=True, url_path="")
+pg_kmeans = st.Page(str(PAGES["kmeans"]),                title="🚗 차명별 군집분석",    url_path="kmeans")
+pg_reco   = st.Page(str(PAGES["reco"]),                  title="✨ 기업 추천",          url_path="reco")
+pg_fraud  = st.Page(str(PAGES["fraud"]),                 title="🌳 이상거래 의심",      url_path="fraud")
+pg_ts     = st.Page(str(PAGES["timeseries"]),            title="📈 시세 분석",          url_path="timeseries")
+
+# 내비게이션 등록(숨김). 주의: 여기서는 run()을 호출하지 않습니다(홈이 이 파일이기 때문).
+_ = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ts], position="hidden")
+
+# ───────────────────── 공통 스타일(CSS) ─────────────────────
+# 기본 Pages 사이드 내비/검색은 이미 hidden이므로, 추가적인 DOM 강제 숨김 CSS는 제거(버전 변화에 민감)
 st.markdown("""
 <style>
+  .app-container { background: #f6f8fb; }
+  [data-testid="stAppViewContainer"] { background: #f6f8fb; }
+  [data-testid="stHeader"] { background: rgba(246,248,251,0.7); backdrop-filter: blur(6px); }
+  [data-testid="stSidebar"] { background: #0f1b2d; color: #d7e1f2; }
+  [data-testid="stSidebar"] * { font-weight: 500; }
+
+  /* 사이드바 브랜드 고정 */
   [data-testid="stSidebar"] .brand-wrap{
     position: sticky; top: 0; z-index: 10;
-    background:#0f1b2d;               /* 사이드바 배경색과 동일 */
+    background:#0f1b2d;
     padding:12px 12px 6px; margin:0 -8px 8px -8px;
     border-bottom:1px solid rgba(255,255,255,.06);
   }
   [data-testid="stSidebar"] .brand-title{
     font-weight: 900;
-    font-size: 24px;                   /* ← 크게 보이게 */
+    font-size: 24px;
     letter-spacing: .8px;
     color:#ffffff;
     line-height: 1.2;
   }
-</style>
-""", unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-  /* 브랜드 텍스트(맨 위) */
-  [data-testid="stSidebar"] .brand{
-    font-weight: 900; font-size: 18px; letter-spacing: .6px;
-    color: #ffffff; margin: 4px 0 12px 2px;
-  }
-  [data-testid="stSidebar"] .menu-title{
-    color:#cfe0ff; margin: 6px 0 8px 0;
-  }
-
-  /* st.page_link로 생성된 링크의 텍스트를 '내부 요소까지' 밝게 강제 */
+  /* st.page_link로 생성된 링크를 밝게 */
   [data-testid="stSidebar"] a[href]{
-    color:#EAF2FF !important;        /* 링크 자체 색 */
+    color:#EAF2FF !important;
     opacity:1 !important;
     display:block; padding:10px 12px; border-radius:10px; font-weight:700;
   }
-  /* 앵커 내부의 p/span/div에도 동일 색/불투명도 상속 강제 */
   [data-testid="stSidebar"] a[href] *{
     color:inherit !important;
     opacity:1 !important;
     filter:none !important;
   }
-
-  /* 호버/선택 상태는 배경만 살짝 강조 */
   [data-testid="stSidebar"] a[href]:hover{
     background:#13233b !important; color:#ffffff !important;
   }
@@ -91,71 +96,52 @@ st.markdown("""
   [data-testid="stSidebar"] a[aria-current="page"] *{
     color:inherit !important; opacity:1 !important;
   }
+
+  /* 카드/박스 공통 */
+  .kpi-card {
+    border-radius: 14px; padding: 16px 18px; background: #fff;
+    box-shadow: 0 2px 14px rgba(16,24,40,0.06); border: 1px solid #eef2f7; height: 100%;
+  }
+  .kpi-title { font-size: 13px; color:#7a8aa0; margin-bottom: 6px; display:flex; gap:8px; align-items:center;}
+  .kpi-value { font-size: 26px; font-weight: 700; }
+  .kpi-trend-up { color:#10b981; font-weight:700; }
+  .kpi-trend-down { color:#ef4444; font-weight:700; }
+
+  .box { background:#fff; border:1px solid #eef2f7; border-radius:14px; padding:14px; box-shadow:0 2px 14px rgba(16,24,40,.06); }
+  .box-title { font-weight:700; color:#0f172a; display:flex; align-items:center; gap:10px; }
+  .muted { color:#8a99ad; font-size:13px; }
+  .blank { height:6px; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<style>
-  [data-testid="stSidebar"] .brand-wrap{
-    position: sticky; top: 0; z-index: 10;
-    background:#0f1b2d;               /* 사이드바 배경에 맞춤 */
-    padding:10px 12px 8px; margin:0 -8px 8px -8px;
-    border-bottom:1px solid rgba(255,255,255,.06);
-  }
-  [data-testid="stSidebar"] .brand{
-    font-weight:900; font-size:18px; letter-spacing:.6px; color:#ffffff;
-  }
-</style>
-""", unsafe_allow_html=True)
-# ───────────────────── 기본 Pages 내비/검색 숨기기 ─────────────────────
-st.markdown(
-    """
-    <style>
-      /* Streamlit 기본 Pages 내비게이션(검색 + 목록) 완전히 숨김 */
-      [data-testid="stSidebarNav"] { display: none !important; }
-      nav[aria-label="Pages"] { display: none !important; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# ───────────────────── 사이드바: 브랜드 + 커스텀 메뉴 ─────────────────────
+with st.sidebar:
+    # 상단 고정 브랜드
+    st.markdown(
+        '<div class="brand-wrap"><div class="brand-title">BATTERY-INFO</div></div>',
+        unsafe_allow_html=True
+    )
 
-# ───────────────────── 공통 스타일(CSS) ─────────────────────
-st.markdown(
-    """
-    <style>
-      .app-container { background: #f6f8fb; }
-      [data-testid="stAppViewContainer"] { background: #f6f8fb; }
-      [data-testid="stHeader"] { background: rgba(246,248,251,0.7); backdrop-filter: blur(6px); }
-      [data-testid="stSidebar"] { background: #0f1b2d; color: #d7e1f2; }
-      [data-testid="stSidebar"] * { font-weight: 500; }
+    st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
 
-      /* 커스텀 메뉴(우리 손으로 만든 링크) */
-      .menu-link {
-        display:flex; align-items:center; gap:.5rem;
-        padding:10px 12px; margin:4px 0; border-radius:10px;
-        color:#e6efff; text-decoration:none; font-weight:600;
-      }
-      .menu-link:hover { background:#13233b; color:#fff; }
-      .menu-section-title { color:#cfe0ff; font-weight:800; letter-spacing:.2px; }
+    # 안정적 링크 헬퍼: page_link 실패 시 switch_page 폴백
+    def safe_page_link(page_obj, label: str, icon: str | None = None):
+        try:
+            st.page_link(page_obj, label=label, icon=icon)
+        except Exception:
+            if st.button(f"{icon or ''} {label}", use_container_width=True):
+                try:
+                    st.switch_page(page_obj)
+                except Exception:
+                    # 마지막 폴백: 문자열 경로로 재시도
+                    if isinstance(page_obj, st.Page):
+                        # st.Page은 str로 캐스팅하면 경로가 안나올 수 있어 url_path로 유도
+                        st.switch_page(f"/{getattr(page_obj, 'url_path', '').lstrip('/') or ''}")
 
-      /* 카드 공통 */
-      .kpi-card {
-        border-radius: 14px; padding: 16px 18px; background: #fff;
-        box-shadow: 0 2px 14px rgba(16,24,40,0.06); border: 1px solid #eef2f7; height: 100%;
-      }
-      .kpi-title { font-size: 13px; color:#7a8aa0; margin-bottom: 6px; display:flex; gap:8px; align-items:center;}
-      .kpi-value { font-size: 26px; font-weight: 700; }
-      .kpi-trend-up { color:#10b981; font-weight:700; }
-      .kpi-trend-down { color:#ef4444; font-weight:700; }
-
-      .box { background:#fff; border:1px solid #eef2f7; border-radius:14px; padding:14px; box-shadow:0 2px 14px rgba(16,24,40,.06); }
-      .box-title { font-weight:700; color:#0f172a; display:flex; align-items:center; gap:10px; }
-      .muted { color:#8a99ad; font-size:13px; }
-      .blank { height:6px; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+    safe_page_link(pg_kmeans, "군집 분석",     "🚗")
+    safe_page_link(pg_reco,   "기업 추천",     "✨")
+    safe_page_link(pg_fraud,  "이상거래 의심", "🌳")
+    safe_page_link(pg_ts,     "시세 분석",     "📈")
 
 # ───────────────────── 타이틀/브레드크럼 ─────────────────────
 today = pd.Timestamp.today()
@@ -172,7 +158,7 @@ st.markdown(
 )
 
 # ───────────────────── 데이터 로드 ─────────────────────
-DATA_PATH = Path("data/통합거래내역.csv")
+DATA_PATH = ROOT / "data/통합거래내역.csv"
 
 @st.cache_data
 def load_data(path: Path) -> pd.DataFrame | None:
@@ -191,22 +177,6 @@ def load_data(path: Path) -> pd.DataFrame | None:
     return df
 
 df = load_data(DATA_PATH)
-
-# ───────────────────── 사이드바: 커스텀 메뉴(방법B) ─────────────────────
-with st.sidebar:
-    # 상단 고정 브랜드
-    st.markdown(
-        '<div class="brand-wrap"><div class="brand-title">BATTERY-INFO</div></div>',
-        unsafe_allow_html=True
-    )
-
-with st.sidebar:
-    st.markdown("### 📂 분석 결과 확인", help="상단 기본 Pages 네비 대신 커스텀 메뉴를 사용합니다.")
-    st.page_link(pg_kmeans, label="군집 분석",     icon="🚗")
-    st.page_link(pg_reco,   label="기업 추천",     icon="✨")
-    st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
-    st.page_link(pg_ts,     label="시세 분석",     icon="📈")
-
 
 # ───────────────────── 데이터 유무 방어 ─────────────────────
 if df is None or ("계약일" not in df.columns):
@@ -329,7 +299,6 @@ with right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ───────────────────── 하단: (좌) 고객 지원 · (우) 분석 결과 ─────────────────────
-# 레이아웃: 왼쪽 고객지원 · 오른쪽 KMeans 결과
 c_left, c_right = st.columns([2.4, 2])
 
 with c_left:
@@ -345,29 +314,23 @@ with c_left:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ──────────────────────────────────────────────────────────────
-# ──────────────────────────────────────────────────────────────
 # KMeans 전용: 엑셀 로더 + 컬럼 표준화 + (k 자동결정: Sil/Elbow/Dendr) + 차트 + 렌더링
+# ──────────────────────────────────────────────────────────────
 
-# 필요한 패키지 (중복 import 되어도 무방)
-import numpy as np
-import pandas as pd
-from pathlib import Path
 from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
 from sklearn.compose import ColumnTransformer
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
-import plotly.graph_objects as go
-import plotly.express as px
 
-# 덴드로그램용(필수 아님) - 설치 안 되어 있으면 자동 우회
+# 덴드로그램용(선택)
 try:
     from scipy.cluster.hierarchy import linkage
     _has_scipy = True
 except Exception:
     _has_scipy = False
 
-# Yellowbrick(선택) - 설치 안 되어 있으면 자동 우회
+# Yellowbrick(선택)
 try:
     from yellowbrick.cluster import KElbowVisualizer  # noqa
     _has_yb = True
@@ -375,7 +338,7 @@ except Exception:
     _has_yb = False
 
 # 1) 엑셀 로더
-KMEANS_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
+KMEANS_PATH = ROOT / "data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx"
 
 @st.cache_data(show_spinner=False)
 def load_kmeans_data(path: Path) -> pd.DataFrame | None:
@@ -387,7 +350,7 @@ def load_kmeans_data(path: Path) -> pd.DataFrame | None:
 
 df_kmeans = load_kmeans_data(KMEANS_PATH)
 
-# 2) 컬럼 표준화(중복 방지 + 숫자/범주 정리)
+# 2) 컬럼 표준화
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
 
@@ -397,7 +360,6 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
                 return c
         return None
 
-    # 표준 컬럼명 매핑
     mapping = {}
     schema = [
         ("Model",       ["차명", "배터리종류", "차종", "모델"]),
@@ -413,11 +375,9 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     out = out.rename(columns=mapping)
 
-    # 같은 이름으로 합쳐졌을 수 있으므로 중복 열 제거(첫 번째만 유지)
     if out.columns.duplicated().any():
         out = out.loc[:, ~out.columns.duplicated()]
 
-    # 범주 매핑(정상 추가)
     if "CellBalance" in out.columns:
         out["CellBalance"] = (
             out["CellBalance"]
@@ -425,7 +385,6 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
             .fillna(out["CellBalance"])
         )
 
-    # 숫자 정리(문자/기호 제거 후 숫자화)
     if "Price" in out.columns:
         out["Price"] = (
             out["Price"]
@@ -440,7 +399,7 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     return out
 
-# 3) k 자동결정: 실루엣·엘보우(관성)·덴드로그램 gap → 중앙값
+# 3) k 자동결정
 def _choose_k_multi(X: np.ndarray, ks: list[int], max_dendro_samples: int = 200):
     results = {}
 
@@ -458,17 +417,17 @@ def _choose_k_multi(X: np.ndarray, ks: list[int], max_dendro_samples: int = 200)
     except Exception:
         pass
 
-    # 2) Elbow (Inertia) - 가장 큰 기울기 감소 지점
+    # 2) Elbow(Inertia)
     try:
         inertias = [KMeans(n_clusters=k, random_state=42, n_init='auto').fit(X).inertia_ for k in ks]
         if len(inertias) >= 2:
             diffs = np.diff(inertias)
-            k_elbow = ks[int(np.argmax(diffs)) + 1]  # +1: diff의 인덱스를 k로 환산
+            k_elbow = ks[int(np.argmax(diffs)) + 1]
             results['elbow'] = k_elbow
     except Exception:
         pass
 
-    # 3) Dendrogram gap (Ward) - 가장 큰 거리 증가 지점
+    # 3) Dendrogram gap (Ward)
     try:
         if _has_scipy:
             n = X.shape[0]
@@ -479,26 +438,14 @@ def _choose_k_multi(X: np.ndarray, ks: list[int], max_dendro_samples: int = 200)
             dists = Z[:, 2]
             gaps = np.diff(dists)
             if len(gaps) >= 1:
-                # 원본 코드와 동일한 변환
                 k_dend = max(2, min(n - (int(np.argmax(gaps)) + 1), ks[-1]))
                 results['dendrogram'] = k_dend
     except Exception:
         pass
 
-    # 4) Yellowbrick (설치된 경우만; 참고용) — 최종 median 계산에는 포함 X
-    try:
-        if _has_yb:
-            # silhouette 기준으로 elbow_value_를 얻을 수 있지만,
-            # 그림 렌더는 생략(서버 환경에서 GUI 없음 가정)
-            pass
-    except Exception:
-        pass
-
-    # 최종 선택: Sil/Elbow/Dend 중 존재하는 값들의 중앙값
     votes = [results.get('silhouette'), results.get('elbow'), results.get('dendrogram')]
     votes = [v for v in votes if v is not None]
     if not votes:
-        # 모든 방법 실패 시 안전한 기본값
         return {'k_final': 3, 'detail': results}
 
     k_final = int(np.median(votes))
@@ -510,32 +457,27 @@ def _choose_k_multi(X: np.ndarray, ks: list[int], max_dendro_samples: int = 200)
 def make_model_charts(
     df: pd.DataFrame,
     model_name: str,
-    k: int | str = "auto",     # "auto" → 위의 멀티 방식 사용
+    k: int | str = "auto",
     reducer: str = "pca",
-    aggregate_radar: bool = True,   # 메인에는 평균 1개 레이더가 깔끔
+    aggregate_radar: bool = True,
 ):
     df = _normalize_columns(df)
 
-    # 필수 컬럼 체크
     if 'Model' not in df.columns:
         raise ValueError("필수 컬럼 'Model'이 없습니다.")
 
-    # 사용 가능한 수치 컬럼(최소 2개 필요)
     numeric_pool = [c for c in ['Age', 'SoH', 'Price'] if c in df.columns]
     if len(numeric_pool) < 2:
         raise ValueError(f"수치 컬럼이 부족합니다(필요≥2): {numeric_pool}")
 
-    # 모델 필터 + 수치 결측 제거
     sub = df[df['Model'].astype(str).str.contains(model_name, case=False, na=False)].copy()
     sub = sub.dropna(subset=numeric_pool)
     if sub.empty or len(sub) < 3:
         raise ValueError(f"'{model_name}' 유효 데이터가 {len(sub)}건입니다(≥3 필요).")
 
-    # 혹시 모를 중복 열 제거
     if sub.columns.duplicated().any():
         sub = sub.loc[:, ~sub.columns.duplicated()]
 
-    # 전처리 파이프라인
     pre = ColumnTransformer([
         ('num', StandardScaler(), numeric_pool),
         ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'),
@@ -546,12 +488,11 @@ def make_model_charts(
     if hasattr(X, "toarray"):
         X = X.toarray()
 
-    # k 결정
     if isinstance(k, str) and k == "auto":
-        ks = list(range(2, min(10, len(sub))))  # 2 ~ 9 (또는 최대 n-1)
+        ks = list(range(2, min(10, len(sub))))
         choose = _choose_k_multi(X, ks)
         k_final = int(choose['k_final'])
-        k_detail = choose['detail'] if 'detail' in choose else {}
+        k_detail = choose.get('detail', {})
     else:
         k_final = int(k)
         k_detail = {}
@@ -560,7 +501,6 @@ def make_model_charts(
     sub['cluster'] = labels
     clusters = sorted(sub['cluster'].unique())
 
-    # ── 레이더(0~100 정규화, Age는 낮을수록 좋다고 가정해 뒤집기) ──
     scaler = MinMaxScaler(feature_range=(0, 100))
     norm_vals = pd.DataFrame(scaler.fit_transform(sub[numeric_pool]),
                              columns=numeric_pool, index=sub.index)
@@ -591,7 +531,6 @@ def make_model_charts(
         legend=dict(orientation="h", yanchor="bottom", y=-0.2)
     )
 
-    # ── 산점도(PCA 2D) ──
     if reducer == "pca":
         pts = PCA(n_components=2, random_state=42).fit_transform(X)
         xlab, ylab = 'PC1', 'PC2'
@@ -607,17 +546,15 @@ def make_model_charts(
     )
     scatter_fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
 
-    # k 상세 표시는 반환값에 함께 넘겨 Streamlit에서 캡션으로 쓸 수 있게 함
     return radar_fig, scatter_fig, k_final, k_detail
 
-# 5) 오른쪽 박스 렌더링
+# 5) 오른쪽 박스: 차명별 군집 결과
 with c_right:
     st.markdown('<div class="box"><div class="box-title">📌 차명별 군집 결과</div>', unsafe_allow_html=True)
 
     if df_kmeans is None:
         st.info("KMeans용 엑셀을 찾을 수 없습니다. `data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx` 를 넣어주세요.")
     else:
-        # '차명' 또는 'Model' 감지(정규화 함수에서도 한 번 더 보정됨)
         model_col = '차명' if '차명' in df_kmeans.columns else ('Model' if 'Model' in df_kmeans.columns else None)
         if model_col is None:
             st.warning("엑셀에 '차명' 또는 'Model' 컬럼이 없습니다.")
@@ -627,7 +564,7 @@ with c_right:
             if pick:
                 try:
                     radar_fig, scatter_fig, k_final, k_detail = make_model_charts(
-                        df_kmeans,                # ← 엑셀 데이터 사용
+                        df_kmeans,
                         model_name=str(pick),
                         k="auto",
                         reducer="pca",
@@ -636,7 +573,6 @@ with c_right:
                     st.plotly_chart(radar_fig, use_container_width=True, config={"displayModeBar": False})
                     st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
 
-                    # k 선정 근거 캡션
                     det = k_detail
                     sil = det.get('silhouette', '—')
                     elb = det.get('elbow', '—')
