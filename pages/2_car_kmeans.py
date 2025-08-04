@@ -201,17 +201,24 @@ mpl.rcParams["axes.unicode_minus"] = False
 st.header("🚗 차명별 K-means 군집 분석")
 
 # ───────────────────────────── 데이터 로드 ─────────────────────────────
+DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
+
 @st.cache_data(show_spinner=False)
 def load_excel(path_or_buffer) -> pd.DataFrame:
     df = pd.read_excel(path_or_buffer, engine="openpyxl")
     df.columns = df.columns.map(lambda x: str(x).strip())
     return df
 
-if uploaded:
-    df_raw = load_excel(uploaded); st.success("업로드한 파일을 사용합니다.")
+uploaded_file = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
+
+df_raw = None
+if uploaded_file is not None:
+    df_raw = load_excel(uploaded_file)
+    st.success("업로드한 파일을 사용합니다.")
 elif DATA_PATH.exists():
     df_raw = load_excel(DATA_PATH)
-else:
+
+if df_raw is None:
     st.error("기본 엑셀 파일을 찾을 수 없습니다. 사이드바에서 업로드해 주세요.")
     st.stop()
 
