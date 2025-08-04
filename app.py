@@ -24,23 +24,24 @@ st.set_page_config(
 )
 st.markdown("""
 <style>
-  /* 목록(링크/텍스트) 색상만 밝게, 흐림 제거 */
-  [data-testid="stSidebarNav"] a,
-  [data-testid="stSidebarNav"] p,
-  [data-testid="stSidebarNav"] span {
-    color: #fffff !important;   /* 밝은 글자색 */
-    opacity: 1 !important;       /* 흐림 제거 */
-    filter: none !important;     /* 혹시 적용된 투명/블러 제거 */
+  /* st.page_link로 만들어지는 링크 전반(텍스트만 밝게, 간격/라운드) */
+  [data-testid="stSidebar"] a[href]{
+    color:#ffffff !important;      /* 밝은 글자색 */
+    opacity:1 !important;          /* 흐림 제거 */
+    filter:none !important;        /* 혹시 남은 필터 제거 */
+    font-weight:700;               /* 굵게 */
+    display:block;
+    padding:10px 12px;
+    border-radius:10px;
   }
-
-  /* 상단 검색창 글자/placeholder 만 밝게 */
-  [data-testid="stSidebarNav"] input {
-    color: #eaf2ff !important;
+  /* 호버 시 배경만 살짝 강조, 텍스트는 더 화이트 */
+  [data-testid="stSidebar"] a[href]:hover{
+    background:#13233b !important;
+    color:#ffffff !important;
   }
-  [data-testid="stSidebarNav"] input::placeholder {
-    color: #9fb2cf !important;
-    opacity: 1 !important;
-  }
+  /* 섹션 타이틀/보조 텍스트 색감 */
+  [data-testid="stSidebar"] .menu-section-title{ color:#cfe0ff; font-weight:800; }
+  [data-testid="stSidebar"] .menu-caption{ color:#9fb2cf; }
 </style>
 """, unsafe_allow_html=True)
 
