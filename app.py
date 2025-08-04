@@ -327,152 +327,34 @@ with c_left:
     })
     st.dataframe(demo_support, use_container_width=True, height=240)
     st.markdown('</div>', unsafe_allow_html=True)
+with c_right:
+    st.markdown('<div class="box"><div class="box-title">📌 차명별 군집 결과</div>', unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────────────────────
-# 필요한 패키지
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler, OneHotEncoder, MinMaxScaler
-from sklearn.compose import ColumnTransformer
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-from sklearn.decomposition import PCA
-import plotly.graph_objects as go
-import plotly.express as px
+    # '차명' 또는 'Model' 컬럼 자동 감지
+    model_col = '차명' if '차명' in df.columns else ('Model' if 'Model' in df.columns else None)
 
-# 한글 컬럼 → 영문 표준화(있을 때만)
-def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    rename_map = {
-        '사용연수(t)': 'Age',
-        'SoH_pred(%)': 'SoH',
-        '중고거래가격': 'Price',
-        '셀 간 균형': 'CellBalance',
-        '차명': 'Model'
-    }
-    out = df.rename(columns={k:v for k,v in rename_map.items() if k in df.columns}).copy()
-    if 'CellBalance' in out.columns:
-        out['CellBalance'] = out['CellBalance'].map({'우수':'Good','경고':'Warning','심각':'Critical'}).fillna(out['CellBalance'])
-    return out
+    if model_col:
+        models = sorted(df[model_col].dropna().astype(str).unique())
+        # 상단 드롭다운(숨김 라벨)
+        pick = st.selectbox("차종 선택", models, index=0 if models else None, label_visibility="collapsed")
 
-def _auto_k(X, ks):
-    # 실루엣 최고값 k (계산 안 되면 3)
-    try:
-        scores = []
-        for k in ks:
-            if k >= len(X): break
-            labels = KMeans(n_clusters=k, random_state=42, n_init='auto').fit_predict(X)
-            scores.append(silhouette_score(X, labels))
-        return ks[int(np.argmax(scores))] if scores else 3
-    except Exception:
-        return 3
-
-def make_model_charts(
-    df: pd.DataFrame,
-    model_name: str,
-    k: int | str = "auto",
-    reducer: str = "pca",
-    aggregate_radar: bool = False,
-):
-    """
-    df      : 원본 데이터프레임(한글/영문 컬럼 모두 허용)
-    model_name : 차명 (예: '코나 일렉트릭 (KONA ELECTRIC)' 또는 'Kona Electric')
-    k       : 군집 수 (정수 또는 'auto')
-    reducer : 'pca' (권장) / 'none'
-    aggregate_radar : True면 클러스터별 대신 '모델 평균 1개' 레이더를 그림
-    반환     : (radar_fig: go.Figure, scatter_fig: go.Figure)
-    """
-    df = _normalize_columns(df)
-
-    required = {'Model','Age','SoH','Price'}
-    if not required.issubset(df.columns):
-        raise ValueError(f"데이터에 필요한 컬럼이 없습니다: {required - set(df.columns)}")
-
-    sub = df[df['Model'].astype(str).str.contains(model_name, case=False, na=False)].copy()
-    n = len(sub)
-    if n < 3:
-        raise ValueError(f"'{model_name}' 데이터가 {n}건으로 너무 적습니다(≥3 필요).")
-
-    # 전처리
-    num_cols = ['Age','SoH','Price']
-    pre = ColumnTransformer([
-        ('num', StandardScaler(), num_cols),
-        ('cat', OneHotEncoder(drop='first', handle_unknown='ignore'), ['CellBalance'] if 'CellBalance' in sub.columns else [])
-    ], remainder='drop')
-
-    X = pre.fit_transform(sub)
-    if hasattr(X, "toarray"):
-        X = X.toarray()
-
-    # k 결정
-    if isinstance(k, str) and k == "auto":
-        ks = list(range(2, min(9, n)))  # 2~8
-        k_final = _auto_k(X, ks)
+        if pick:
+            try:
+                radar_fig, scatter_fig = make_model_charts(
+                    df,
+                    model_name=str(pick),  # 선택한 차종
+                    k="auto",              # 군집 수 자동 결정
+                    reducer="pca",
+                    aggregate_radar=True   # 평균 1개 레이더; 클러스터별이면 False
+                )
+                st.plotly_chart(radar_fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(scatter_fig, use_container_width=True, config={"displayModeBar": False})
+            except Exception as e:
+                st.warning(str(e))
     else:
-        k_final = int(k)
+        st.info("데이터에 '차명' 또는 'Model' 컬럼이 없어 차종을 선택할 수 없습니다.")
 
-    # KMeans 라벨
-    labels = KMeans(n_clusters=k_final, random_state=42, n_init='auto').fit_predict(X)
-    sub['cluster'] = labels
-    clusters = sorted(sub['cluster'].unique())
-
-    # ── (1) 레이더 차트 ─────────────────────────────────────────
-    # 수치 컬럼을 0~100으로 정규화 (모델 내 기준)
-    scaler = MinMaxScaler(feature_range=(0, 100))
-    norm_vals = pd.DataFrame(scaler.fit_transform(sub[num_cols]), columns=num_cols, index=sub.index)
-    # 'Age'는 낮을수록 좋은 지표라고 가정 → 뒤집기(옵션)
-    norm_vals['Age'] = 100 - norm_vals['Age']
-
-    if aggregate_radar:
-        # 모델 평균 1개 폴리곤
-        avg = norm_vals.mean().reindex(num_cols).tolist()
-        radar_fig = go.Figure()
-        radar_fig.add_trace(go.Scatterpolar(
-            r=avg + [avg[0]],
-            theta=num_cols + [num_cols[0]],
-            fill='toself',
-            name=model_name
-        ))
-    else:
-        # 클러스터별 폴리곤
-        radar_fig = go.Figure()
-        for c in clusters:
-            v = norm_vals.loc[sub['cluster']==c, num_cols].mean().tolist()
-            radar_fig.add_trace(go.Scatterpolar(
-                r=v + [v[0]],
-                theta=num_cols + [num_cols[0]],
-                fill='toself',
-                name=f'Cluster {c}'
-            ))
-
-    radar_fig.update_layout(
-        title=f"{model_name} : Radar",
-        polar=dict(radialaxis=dict(visible=True, range=[0,100])),
-        margin=dict(l=10, r=10, t=30, b=10),
-        height=260,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2)
-    )
-
-    # ── (2) 산점도 (PCA 2D) ────────────────────────────────────
-    if reducer == "pca":
-        pts = PCA(n_components=2, random_state=42).fit_transform(X)
-        scatter_fig = px.scatter(
-            x=pts[:,0], y=pts[:,1],
-            color=sub['cluster'].astype(str),
-            labels={'x':'PC1','y':'PC2','color':'Cluster'},
-            title=f"{model_name} : Cluster Scatter (PCA 2D)",
-            height=280
-        )
-    else:
-        scatter_fig = px.scatter(
-            x=np.arange(n), y=np.zeros(n),
-            color=sub['cluster'].astype(str),
-            labels={'x':'index','y':'','color':'Cluster'},
-            title=f"{model_name} : Clusters",
-            height=280
-        )
-
-    scatter_fig.update_layout(margin=dict(l=10,r=10,t=30,b=10))
-    return radar_fig, scatter_fig
+    st.markdown('</div>', unsafe_allow_html=True)
 # ──────────────────────────────────────────────────────────────
 
 
