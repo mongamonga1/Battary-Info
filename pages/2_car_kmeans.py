@@ -7,7 +7,6 @@ import os, base64
 from io import BytesIO
 from pathlib import Path
 from math import pi
-import time
 
 import streamlit as st
 import pandas as pd
@@ -23,34 +22,25 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-# --- OpenAI secrets 헬퍼: [openai] 섹션/단일 키/환경변수 모두 지원 ---
+# ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
     """
     반환: (api_key:str|None, model_name:str|None)
     - Streamlit Secrets의 [openai].api_key / [openai].model 우선
-    - OPENAI_API_KEY(단일 키)도 허용
-    - 환경변수 OPENAI_API_KEY 도 마지막 보루
+    - st.secrets["OPENAI_API_KEY"] / 환경변수 OPENAI_API_KEY 도 허용
     """
     api_key = None
     model_name = None
-
-    # 1) [openai] 섹션
     if hasattr(st, "secrets") and "openai" in st.secrets:
         sect = st.secrets["openai"]
         api_key = sect.get("api_key") or api_key
         model_name = sect.get("model") or model_name
-
-    # 2) 단일 키도 허용
     if hasattr(st, "secrets"):
         api_key = api_key or st.secrets.get("OPENAI_API_KEY")
-
-    # 3) 환경변수
-    import os
     api_key = api_key or os.environ.get("OPENAI_API_KEY")
-
     return api_key, model_name
 
-# ── 선택 라이브러리(있으면 활용: 덴드로그램/엘보우)
+# ───────────────────────────── 선택 라이브러리 ─────────────────────────────
 try:
     from scipy.cluster.hierarchy import linkage
     _has_scipy = True
@@ -63,24 +53,117 @@ try:
 except Exception:
     _has_yb = False
 
-# ── Word Export
+# ───────────────────────────── Word Export 유틸 ─────────────────────────────
 from docx import Document
 from docx.shared import Inches, Pt
 from docx.oxml.ns import qn
 
-# ── OpenAI (Chat Completions)
+def _apply_korean_fonts(doc, font_name="Malgun Gothic", size_pt=11):
+    style = doc.styles["Normal"]
+    style.font.name = font_name
+    style.font.size = Pt(size_pt)
+    rpr = style._element.get_or_add_rPr()
+    rFonts = rpr.get_or_add_rFonts()
+    for k in ("w:eastAsia", "w:ascii", "w:hAnsi"):
+        rFonts.set(qn(k), font_name)
+    for h in ("Title", "Heading 1", "Heading 2", "Heading 3"):
+        if h in doc.styles:
+            s = doc.styles[h]
+            s.font.name = font_name
+            rpr = s._element.get_or_add_rPr()
+            rFonts = rpr.get_or_add_rFonts()
+            for k in ("w:eastAsia", "w:ascii", "w:hAnsi"):
+                rFonts.set(qn(k), font_name)
+
+def _add_step(doc, n, title):
+    p = doc.add_paragraph(f"Step {n}: {title}")
+    p.style = "Heading 1"
+
+def export_word_like_full(
+    doc_title,
+    model,
+    gpt_analysis_text,
+    main_imgs,          # list of (caption, png_bytes)
+    profile_imgs,       # list of (caption, png_bytes)
+    dfm,                # pandas.DataFrame (must include 'cluster')
+    num_pool,           # list[str]
+    votes,              # dict
+    k_final,
+    font_name="Malgun Gothic",
+):
+    doc = Document()
+    _apply_korean_fonts(doc, font_name=font_name, size_pt=11)
+
+    # Title
+    doc.add_heading(f"EV Battery Clustering Report – {model}", level=0)
+
+    # Step 1~4
+    _add_step(doc, 1, "Data Loading & Preprocessing")
+    doc.add_paragraph("✅ 1단계 완료: 데이터 로드 및 전처리 완료.")
+    _add_step(doc, 2, "Model Selection & Filtering")
+    doc.add_paragraph(f"✅ 2단계 완료: 선택된 모델 – {model}, 샘플 수 – {len(dfm):,}개")
+
+    _add_step(doc, 3, "Optimal k Determination")
+    k_sil  = votes.get("silhouette", "—")
+    k_elb  = votes.get("elbow", "—")
+    k_dend = votes.get("dendrogram", "—")
+    doc.add_paragraph(f"Silhouette 최적 k: {k_sil}")
+    doc.add_paragraph(f"Elbow 최적 k: {k_elb}")
+    doc.add_paragraph(f"Dendrogram 추정 k: {k_dend}")
+    doc.add_paragraph(f"✅ 3단계 완료: 최종 k = {k_final}")
+
+    _add_step(doc, 4, "K-Means Clustering")
+    counts = dfm["cluster"].value_counts().sort_index()
+    doc.add_paragraph("✅ 4단계 완료: " + " / ".join([f"Cluster {c} → {int(counts[c])}개" for c in counts.index]))
+
+    # Step 5: 시각화
+    _add_step(doc, 5, "Visualizations")
+    viz_idx = 1
+    def add_img(cap, png_bytes):
+        nonlocal viz_idx
+        doc.add_paragraph(f"5-{viz_idx}: {cap}")
+        doc.add_picture(BytesIO(png_bytes), width=Inches(6.2))
+        viz_idx += 1
+    for cap, png in main_imgs:    add_img(cap, png)
+    for cap, png in profile_imgs: add_img(cap, png)
+
+    # Step 6: 클러스터 요약 (GPT 생성 본문)
+    _add_step(doc, 6, "Cluster-wise Summary")
+    for para in str(gpt_analysis_text).split("\n"):
+        if para.strip():
+            doc.add_paragraph(para.strip())
+    doc.add_paragraph("✅ 6단계 완료: 클러스터별 통계 요약 완료.")
+
+    # 마지막 표(평균)
+    means = dfm.groupby("cluster")[num_pool].mean().round(2)
+    tbl = doc.add_table(rows=1, cols=2 + len(num_pool))
+    hdr = tbl.rows[0].cells
+    hdr[0].text = "Cluster"; hdr[1].text = "Count"
+    for i, c in enumerate(num_pool, start=2): hdr[i].text = f"Mean {c}"
+    for c in counts.index:
+        row = tbl.add_row().cells
+        row[0].text = str(c); row[1].text = str(int(counts[c]))
+        for j, col in enumerate(num_pool, start=2):
+            row[j].text = str(means.loc[c, col])
+
+    bio = BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+# ───────────────────────────── OpenAI (Chat Completions) ─────────────────────────────
 try:
     from openai import OpenAI
     _has_openai = True
 except Exception:
     _has_openai = False
 
-# ───────────────────── 기본 설정 ─────────────────────
+# ───────────────────────────── 기본 설정 ─────────────────────────────
 mpl.rcParams["font.family"] = "DejaVu Sans"
 mpl.rcParams["axes.unicode_minus"] = False
 st.header("🚗 차명별 K-means 군집 분석")
 
-# ───────────────────── 데이터 로드 ─────────────────────
+# ───────────────────────────── 데이터 로드 ─────────────────────────────
 DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
 uploaded = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
 
@@ -98,7 +181,7 @@ else:
     st.error("기본 엑셀 파일을 찾을 수 없습니다. 사이드바에서 업로드해 주세요.")
     st.stop()
 
-# ───────────────────── 컬럼 표준화 ─────────────────────
+# ───────────────────────────── 컬럼 표준화 ─────────────────────────────
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     def pick_first(cands):
@@ -118,11 +201,9 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
         if src: mapping[src] = std
     out = out.rename(columns=mapping)
 
-    # 중복 열 제거
     if out.columns.duplicated().any():
         out = out.loc[:, ~out.columns.duplicated()]
 
-    # 범주 매핑
     if "CellBalance" in out.columns:
         out["CellBalance"] = (
             out["CellBalance"]
@@ -130,7 +211,6 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
               .fillna(out["CellBalance"])
         )
 
-    # 숫자 정리
     if "Price" in out.columns:
         out["Price"] = (out["Price"].astype(str)
                         .str.replace(r"[^\d.\-]", "", regex=True)
@@ -153,7 +233,7 @@ if len(num_pool) < 2:
     st.error(f"수치 컬럼이 부족합니다(필요≥2). 현재: {num_pool}")
     st.stop()
 
-# ───────────────────── 사이드바 ─────────────────────
+# ───────────────────────────── 사이드바 ─────────────────────────────
 models        = sorted(df["Model"].dropna().astype(str).unique())
 choice        = st.sidebar.selectbox("차명 선택", models)
 show_tsne     = st.sidebar.checkbox("t-SNE 2D 추가", value=True)
@@ -166,21 +246,17 @@ st.sidebar.markdown("### 💸 비용 옵션")
 cost_saver = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
 DEFAULT_MODEL = "gpt-4o-mini"
 
-# Secrets/환경변수에서 키·모델 읽기
 _api_key, _model_from_secret = get_openai_conf()
 MODEL_NAME = _model_from_secret or DEFAULT_MODEL
-MAX_TOKENS = 320 if cost_saver else 600
-
 TEMPERATURE = st.sidebar.slider("요약 temperature", 0.0, 1.0, 0.2, 0.05)
 MAX_TOKENS  = 320 if cost_saver else 600
 
-# 상태 표시(선택)
 if _api_key:
     st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
 else:
     st.sidebar.warning("🔒 OPENAI_API_KEY 미설정 → 로컬 요약으로 대체")
 
-# ───────────────────── 모델 데이터 준비 ─────────────────────
+# ───────────────────────────── 모델 데이터 준비 ─────────────────────────────
 sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
 n = len(sub_all)
 if n < 3:
@@ -203,35 +279,28 @@ if hasattr(X, "toarray"): X = X.toarray()
 # ───────────── k = Silhouette + Elbow + Dendrogram → 중앙값 ─────────────
 def choose_k_multi(X, ks):
     votes = {}
-    # 1) Silhouette
     try:
-        sil_scores = [silhouette_score(
-            X, KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(X)
-        ) for k in ks if k < len(X)]
-        if sil_scores:
-            votes["silhouette"] = ks[int(np.argmax(sil_scores))]
+        sil_scores = [silhouette_score(X, KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(X))
+                      for k in ks if k < len(X)]
+        if sil_scores: votes["silhouette"] = ks[int(np.argmax(sil_scores))]
     except Exception:
         pass
-    # 2) Elbow
     try:
         if _has_yb:
             viz = KElbowVisualizer(KMeans(random_state=42, n_init=10), k=ks, metric="distortion", timings=False)
             viz.fit(X)
-            if viz.elbow_value_ is not None:
-                votes["elbow"] = int(viz.elbow_value_)
+            if viz.elbow_value_ is not None: votes["elbow"] = int(viz.elbow_value_)
         else:
             inertias = [KMeans(n_clusters=k, random_state=42, n_init=10).fit(X).inertia_ for k in ks]
             if len(inertias) >= 2:
-                diffs = np.diff(inertias)
-                idx = int(np.argmax(diffs))
+                diffs = np.diff(inertias); idx = int(np.argmax(diffs))
                 votes["elbow"] = ks[idx+1] if idx+1 < len(ks) else ks[-1]
     except Exception:
         pass
-    # 3) Dendrogram gap
     try:
         if _has_scipy:
             m = X.shape[0]
-            idx = np.arange(m if m <= 200 else 200)  # 앞 200개 샘플 (속도)
+            idx = np.arange(m if m <= 200 else 200)
             Z = linkage(X[idx], method="ward")
             dists = Z[:,2]; gaps = np.diff(dists)
             if len(gaps) >= 1:
@@ -246,19 +315,19 @@ k_final, votes = choose_k_multi(X, ks)
 st.caption(f"선택된 k = {k_final} (Sil={votes.get('silhouette','—')}, "
            f"Elbow={votes.get('elbow','—')}, Dend={votes.get('dendrogram','—')} → median)")
 
-# ───────────────────── 학습 & 라벨 ─────────────────────
+# ───────────────────────────── 학습 & 라벨 ─────────────────────────────
 labels = KMeans(n_clusters=k_final, random_state=42, n_init=10).fit_predict(X)
 sub_all = sub_all.copy(); sub_all["cluster"] = labels
 clusters = sorted(sub_all["cluster"].unique())
 
-# ── 유틸: fig → png, base64
+# ───────────────────────────── 유틸: fig → png/base64 ─────────────────────────────
 def fig_to_png(fig, dpi=160):
     buf = BytesIO(); fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight"); plt.close(fig)
     return buf.getvalue()
 
 def to_b64(png_bytes): return base64.b64encode(png_bytes).decode("utf-8")
 
-# ── 공통 CSS(가로 스크롤)
+# ───────────────────────────── 공통 CSS(가로 스크롤) ─────────────────────────────
 st.markdown("""
 <style>
 .scroll-x { overflow-x:auto; padding:8px 0 10px; }
@@ -268,23 +337,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ───────────────────── 결과 그래프(가로 스크롤) ─────────────────────
-main_images = []  # (caption, png_bytes)
+# ───────────────────────────── 결과 그래프(가로 스크롤) ─────────────────────────────
+main_images = []
 
 # PCA 2D
 p2 = PCA(2, random_state=42).fit_transform(X)
 fig = plt.figure(figsize=(5.2, 4.0))
 plt.scatter(p2[:,0], p2[:,1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
 plt.title(f"{choice}: PCA 2D (k={k_final})"); plt.xlabel("PC1"); plt.ylabel("PC2"); plt.tight_layout()
-png = fig_to_png(fig); main_images.append(("PCA 2D", png))
+main_images.append(("PCA 2D", fig_to_png(fig)))
 
-# Radar (클러스터 평균, 0~1 정규화)
+# Radar
 mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
 norm_means = mean_matrix.copy()
 for c in num_pool:
     mn, mx = df[c].min(), df[c].max()
     norm_means[c] = 0.5 if (pd.isna(mn) or pd.isna(mx) or mx==mn) else (norm_means[c]-mn)/(mx-mn)
-
 angles = [i/len(num_pool)*2*pi for i in range(len(num_pool))] + [0]
 fig = plt.figure(figsize=(5.2, 4.0)); ax = plt.subplot(111, polar=True)
 for i in clusters:
@@ -292,7 +360,7 @@ for i in clusters:
     ax.plot(angles, vals, label=f"Cluster {i}"); ax.fill(angles, vals, alpha=0.1)
 ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
 plt.title(f"{choice}: Radar (k={k_final})"); plt.legend(loc="upper right", bbox_to_anchor=(1.25,1.05))
-png = fig_to_png(fig); main_images.append(("Radar", png))
+main_images.append(("Radar", fig_to_png(fig)))
 
 # t-SNE 2D (옵션)
 if show_tsne:
@@ -301,7 +369,7 @@ if show_tsne:
     fig = plt.figure(figsize=(5.2, 4.0))
     plt.scatter(ts2[:,0], ts2[:,1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
     plt.title(f"{choice}: t-SNE 2D (k={k_final})"); plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
-    png = fig_to_png(fig); main_images.append(("t-SNE 2D", png))
+    main_images.append(("t-SNE 2D", fig_to_png(fig)))
 
 # PCA 3D (옵션)
 if show_pca3:
@@ -310,22 +378,20 @@ if show_pca3:
     fig = plt.figure(figsize=(5.6, 4.2)); ax3 = fig.add_subplot(111, projection="3d")
     ax3.scatter(p3[:,0], p3[:,1], p3[:,2], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
     ax3.set_title(f"{choice}: PCA 3D (k={k_final})"); ax3.set_xlabel("PC1"); ax3.set_ylabel("PC2"); ax3.set_zlabel("PC3")
-    png = fig_to_png(fig); main_images.append(("PCA 3D", png))
+    main_images.append(("PCA 3D", fig_to_png(fig)))
 
-# 화면 표시(가로 스크롤)
+# 화면 출력(가로 스크롤)
 html_imgs = "".join([f"<img src='data:image/png;base64,{to_b64(p)}' height='320'/>" for _,p in main_images])
 st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_imgs}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='caption-center'>좌우 스크롤로 결과 그래프(PCA2D, Radar, 옵션: t-SNE/PCA3D)를 확인하세요.</div>", unsafe_allow_html=True)
 
-# ───────────────────── 추가 프로파일(가로 스크롤) ─────────────────────
+# ───────────────────────────── 추가 프로파일(가로 스크롤) ─────────────────────────────
 profile_images = []
 if show_profiles:
-    # Boxplots
     for col in num_pool:
         fig = plt.figure(figsize=(6,4)); sns.boxplot(x="cluster", y=col, data=sub_all, palette="tab10")
         plt.title(f"{choice}: {col} by Cluster (k={k_final})")
         profile_images.append((f"Box {col}", fig_to_png(fig)))
-    # Count & Stacked
     if "CellBalance" in sub_all.columns:
         fig = plt.figure(figsize=(6,4))
         sns.countplot(x="cluster", hue="CellBalance", data=sub_all, palette="Set2")
@@ -338,7 +404,7 @@ if show_profiles:
         ctab_pct.plot(kind="bar", stacked=True, colormap="Paired", ax=ax)
         plt.title(f"{choice}: CellBalance Distribution (%) by Cluster"); plt.tight_layout()
         profile_images.append(("Stacked CellBalance", fig_to_png(fig)))
-    # Heatmap
+
     mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
     fig = plt.figure(figsize=(6,4))
     sns.heatmap(mean_matrix, annot=True, cmap="coolwarm", fmt=".2f")
@@ -349,15 +415,13 @@ if show_profiles:
     st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_prof}</div></div>", unsafe_allow_html=True)
     st.markdown("<div class='caption-center'>추가 프로파일도 가로 스크롤로 확인하세요.</div>", unsafe_allow_html=True)
 
-# ───────────────────── GPT 요약 (Chat Completions) & Word 내보내기 ─────────────────────
+# ───────────────────────────── GPT 요약 & Word 내보내기 ─────────────────────────────
 st.subheader("🧠 믿:음 분석결과 & Word 내보내기")
 
-# 세션 상태 저장
 if "ai_text" not in st.session_state:
     st.session_state.ai_text = None
 
 def summarize_compact(dfm: pd.DataFrame, num_pool: list[str]) -> str:
-    """프롬프트용 Compact 통계(입력 토큰 절약)"""
     counts = dfm["cluster"].value_counts().sort_index()
     means  = dfm.groupby("cluster")[num_pool].mean()
     line_counts = f"N={len(dfm)}, k={dfm['cluster'].nunique()}"
@@ -367,30 +431,16 @@ def summarize_compact(dfm: pd.DataFrame, num_pool: list[str]) -> str:
     ])
     return line_counts + "\n" + line_means
 
-def generate_ai_summary(model: str,
-                        k_final: int,
-                        votes: dict,
-                        dfm: pd.DataFrame,
-                        num_pool: list[str],
-                        model_name: str,
-                        max_tokens: int,
-                        temperature: float) -> str:
+def generate_ai_summary(model, k_final, votes, dfm, num_pool, model_name, max_tokens, temperature):
     stats_compact = summarize_compact(dfm, num_pool)
     try:
         if not _has_openai:
             raise RuntimeError("openai 패키지가 설치되어 있지 않습니다.")
-
-        # ← 여기! 통합 헬퍼로 가져옴
         api_key, model_from_secret = get_openai_conf()
-        # secrets에 모델명이 있으면 덮어씀
-        if model_from_secret:
-            model_name = model_from_secret
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY not set")
+        if model_from_secret: model_name = model_from_secret
+        if not api_key: raise RuntimeError("OPENAI_API_KEY not set")
 
-        from openai import OpenAI
         client = OpenAI(api_key=api_key)
-
         system_msg = (
             "You are a concise Korean data analyst. "
             "군집분석 결과를 250~350자 한국어 본문으로 요약하라. "
@@ -403,111 +453,22 @@ def generate_ai_summary(model: str,
             f"Elbow={votes.get('elbow')}, Dend={votes.get('dendrogram')})\n"
             f"[요약통계]\n{stats_compact}"
         )
-
         resp = client.chat.completions.create(
-            model=model_name,            # 예: gpt-4o-mini
-            messages=[
-                {"role": "system", "content": system_msg},
-                {"role": "user",   "content": user_prompt},
-            ],
+            model=model_name,
+            messages=[{"role":"system","content":system_msg},
+                      {"role":"user","content":user_prompt}],
             temperature=temperature,
             max_tokens=max_tokens,
         )
         return resp.choices[0].message.content.strip()
-
-    except Exception as e:
-        # 실패 시 로컬 요약(비용 0원)
+    except Exception:
+        # 폴백: 로컬 간단 요약
         cluster_means = dfm.groupby("cluster")[num_pool].mean().round(1)
         top_price = cluster_means["Price"].idxmax() if "Price" in cluster_means.columns else "—"
-        return (
-            f"[로컬 요약] {model}을(를) k={k_final}로 군집화했습니다. "
-            f"SoH·연식·가격 평균 기준 군집 간 차이가 확인됩니다. "
-            f"SoH·가격이 높은 군집({top_price})은 리마케팅 타깃, 저SoH 군집은 정밀 점검 권고가 유효합니다."
-        )
-
-
-# ── Word 도구: 한글 폰트 적용
-def _apply_korean_fonts(doc, font_name="Malgun Gothic", size_pt=11):
-    style = doc.styles["Normal"]
-    style.font.name = font_name
-    style.font.size = Pt(size_pt)
-    rpr = style._element.get_or_add_rPr()
-    rFonts = rpr.get_or_add_rFonts()
-    rFonts.set(qn("w:eastAsia"), font_name)
-    rFonts.set(qn("w:ascii"), font_name)
-    rFonts.set(qn("w:hAnsi"), font_name)
-    for h in ["Heading 1", "Heading 2", "Heading 3"]:
-        if h in doc.styles:
-            st_h = doc.styles[h]
-            st_h.font.name = font_name
-            rpr = st_h._element.get_or_add_rPr()
-            rFonts = rpr.get_or_add_rFonts()
-            rFonts.set(qn("w:eastAsia"), font_name)
-            rFonts.set(qn("w:ascii"), font_name)
-            rFonts.set(qn("w:hAnsi"), font_name)
-
-def export_word(
-    doc_title: str,
-    model: str,
-    gpt_analysis_text: str,
-    main_imgs: list[tuple[str, bytes]],
-    profile_imgs: list[tuple[str, bytes]],
-    dfm: pd.DataFrame,
-    num_pool: list[str],
-    votes: dict,
-    k_final: int,
-    template_path: Path | None = None,
-    font_name: str = "Malgun Gothic"
-) -> BytesIO:
-    if template_path and template_path.exists():
-        doc = Document(str(template_path))
-    else:
-        doc = Document()
-    _apply_korean_fonts(doc, font_name=font_name, size_pt=11)
-
-    # 표지/메타
-    doc.add_heading(doc_title, level=0)
-    doc.add_paragraph(f"모델: {model}")
-    doc.add_paragraph(f"최종 k: {k_final}  (Sil={votes.get('silhouette')}, Elbow={votes.get('elbow')}, Dend={votes.get('dendrogram')})")
-
-    # 분석 결과 (GPT 생성)
-    doc.add_heading("분석 결과 (GPT 생성)", level=1)
-    for para in gpt_analysis_text.split("\n"):
-        if para.strip():
-            doc.add_paragraph(para.strip())
-
-    # 주요 시각화
-    doc.add_heading("주요 시각화", level=1)
-    for cap, png in main_imgs:
-        doc.add_paragraph(cap)
-        doc.add_picture(BytesIO(png), width=Inches(6.2))
-
-    # 클러스터 요약 통계
-    doc.add_heading("클러스터 요약 통계", level=1)
-    counts = dfm["cluster"].value_counts().sort_index()
-    means  = dfm.groupby("cluster")[num_pool].mean().round(2)
-    tbl = doc.add_table(rows=1, cols=2 + len(num_pool))
-    hdr = tbl.rows[0].cells
-    hdr[0].text = "Cluster"; hdr[1].text = "Count"
-    for i, c in enumerate(num_pool, start=2): hdr[i].text = f"Mean {c}"
-    for c in counts.index:
-        row = tbl.add_row().cells
-        row[0].text = str(c); row[1].text = str(int(counts[c]))
-        for i, col in enumerate(num_pool, start=2): row[i].text = str(means.loc[c, col])
-
-    # 추가 프로파일
-    if profile_imgs:
-        doc.add_heading("추가 프로파일", level=1)
-        for cap, png in profile_imgs:
-            doc.add_paragraph(cap)
-            doc.add_picture(BytesIO(png), width=Inches(6.2))
-
-    bio = BytesIO(); doc.save(bio); bio.seek(0)
-    return bio
-
-# ── UI: 버튼 & 출력
-if "ai_text" not in st.session_state:
-    st.session_state.ai_text = None
+        return (f"[로컬 요약] {model}을(를) k={k_final}로 군집화했습니다. "
+                f"SoH·연식·가격 평균 기준 군집 간 차이가 확인됩니다. "
+                f"SoH·가격이 높은 군집({top_price})은 리마케팅 타깃, "
+                f"저SoH 군집은 정밀 점검 권고가 유효합니다.")
 
 col_a, col_b = st.columns([1,2])
 with col_a:
@@ -525,27 +486,24 @@ if gen_btn:
             votes=votes,
             dfm=sub_all,
             num_pool=num_pool,
-            model_name=MODEL_NAME,       # 저가 모델
-            max_tokens=MAX_TOKENS,       # 응답 상한
+            model_name=MODEL_NAME,
+            max_tokens=MAX_TOKENS,
             temperature=TEMPERATURE
         )
         st.session_state.ai_text = ai_text
 
-        TEMPLATE_PATH = Path("data/EV_Battery_Report_Full.docx")  # 있으면 스타일 상속, 없으면 무시
-        template_to_use = TEMPLATE_PATH if TEMPLATE_PATH.exists() else None
-
         word_buf = export_word_like_full(
-    doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
-    model=choice,
-    gpt_analysis_text=ai_text,                  # GPT 요약(한글)
-    main_imgs=main_images,
-    profile_imgs=profile_images if show_profiles else [],
-    dfm=sub_all,
-    num_pool=num_pool,
-    votes=votes,
-    k_final=k_final,
-    font_name="Malgun Gothic"                   # 한글 폰트
-)
+            doc_title=f"EV 배터리 군집 분석 보고서 – {choice}",
+            model=choice,
+            gpt_analysis_text=ai_text,
+            main_imgs=main_images,
+            profile_imgs=profile_images if show_profiles else [],
+            dfm=sub_all,
+            num_pool=num_pool,
+            votes=votes,
+            k_final=k_final,
+            font_name="Malgun Gothic"
+        )
 
     st.success("보고서를 생성했습니다.")
     st.download_button(
@@ -555,21 +513,3 @@ if gen_btn:
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         use_container_width=True,
     )
-
-import os
-from openai import OpenAI
-import streamlit as st
-
-api_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
-if api_key:
-    try:
-        client = OpenAI(api_key=api_key)
-        r = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role":"user", "content":"한 줄로 대답: 연결 테스트 성공 여부만 말해줘."}],
-            max_tokens=10,
-            temperature=0.0,
-        )
-        st.success("응답: " + r.choices[0].message.content)
-    except Exception as e:
-        st.error(f"API 호출 실패: {e}")
