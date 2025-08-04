@@ -201,9 +201,7 @@ mpl.rcParams["axes.unicode_minus"] = False
 st.header("🚗 차명별 K-means 군집 분석")
 
 # ───────────────────────────── 데이터 로드 ─────────────────────────────
-DATA_PATH = Path("data/SoH_NCM_Dataset_selected_Fid_및_배터리등급열추가.xlsx")
-uploaded = st.sidebar.file_uploader("엑셀 업로드(선택)", type=["xlsx"])
-
+@st.cache_data(show_spinner=False)
 def load_excel(path_or_buffer) -> pd.DataFrame:
     df = pd.read_excel(path_or_buffer, engine="openpyxl")
     df.columns = df.columns.map(lambda x: str(x).strip())
@@ -218,6 +216,7 @@ else:
     st.stop()
 
 # ───────────────────────────── 컬럼 표준화 ─────────────────────────────
+@st.cache_data(show_spinner=False)
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     def pick_first(cands):
