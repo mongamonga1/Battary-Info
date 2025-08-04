@@ -10,3 +10,5 @@ joblib
 torch          # LSTM 쓰지 않으면 지워도 됨
 statsmodels
 tabulate
+openai>=1.0.0
+python-docx
