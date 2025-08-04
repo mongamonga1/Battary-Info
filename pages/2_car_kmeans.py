@@ -36,7 +36,12 @@ def apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF"
     </style>
     """, unsafe_allow_html=True)
 
-apply_colors(page_bg="#F5F7FB", sidebar_bg="#0F172A", sidebar_text="#DBE4FF", sidebar_link="#93C5FD")
+apply_colors(
+    page_bg="#F5F7FB",
+    sidebar_bg="#0F172A",
+    sidebar_text="#FFFFFF",    # ← 순백으로 진하게
+    sidebar_link="#93C5FD"
+)
 
 # ───────────────────────────── OpenAI secrets 헬퍼 ─────────────────────────────
 def get_openai_conf():
