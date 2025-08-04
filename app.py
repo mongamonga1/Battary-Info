@@ -578,17 +578,25 @@ with st.sidebar:
         st.page_link(pg_fraud,  label="이상거래 의심", icon="🌳")
         st.page_link(pg_ts,     label="시세 분석", icon="📈")
 
-/* 사이드바 page_link(버튼) 텍스트를 밝게 강제 */
-section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
-section[data-testid="stSidebar"] [data-testid^="stPageLink"] span {
-  color:#EAF2FF !important;   /* 사이드바 글자색 */
-  opacity:1 !important;
-}
+st.markdown(
+    """
+    <style>
+      /* ...여기 기존 스타일들... */
 
-/* (옵션) 선택된 항목도 가독성 유지 */
-section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span {
-  color:#FFFFFF !important;
-}
+      /* 사이드바 page_link(버튼) 텍스트 보이게 */
+      section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
+      section[data-testid="stSidebar"] [data-testid^="stPageLink"] span {
+        color:#EAF2FF !important;  /* 글자색 밝게 */
+        opacity:1 !important;
+      }
+      /* 선택된 페이지(현재 페이지)도 가독성 유지 */
+      section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span {
+        color:#FFFFFF !important;
+      }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # ───────────────────── 선택된 페이지 실행 (필수) ─────────────────────
 current.run()
