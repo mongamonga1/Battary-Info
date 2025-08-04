@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""차명별 K-means 군집 분석 (k 자동선정, 결과 그래프 가로 타일 + 추가프로파일 가로 스크롤)"""
+"""차명별 K-means 군집 분석 (k 자동선정, 모든 결과·프로파일 가로 스크롤)"""
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -23,7 +23,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-# SciPy(덴드로그램) / Yellowbrick(엘보우) -> 계산에만 사용(표시 X)
+# SciPy / Yellowbrick → 내부 계산만(표시는 X)
 try:
     from scipy.cluster.hierarchy import linkage
     _has_scipy = True
@@ -122,12 +122,11 @@ if len(num_pool) < 2:
     st.stop()
 
 # ───────────────────────── 사이드바 ─────────────────────────
-models       = sorted(df["Model"].dropna().astype(str).unique())
-choice       = st.sidebar.selectbox("차명 선택", models)
-show_pca3    = st.sidebar.checkbox("PCA 3D 표시 (별도)", value=False)
-show_tsne    = st.sidebar.checkbox("t-SNE 2D 표시", value=True)
-perplexity   = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
-cols_per_row = st.sidebar.slider("결과 그래프 가로 배치 수", 2, 3, 3)
+models        = sorted(df["Model"].dropna().astype(str).unique())
+choice        = st.sidebar.selectbox("차명 선택", models)
+show_tsne     = st.sidebar.checkbox("t-SNE 2D 추가", value=True)
+show_pca3     = st.sidebar.checkbox("PCA 3D 추가", value=False)
+perplexity    = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
 show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", value=True)
 
 # ───────────────────────── 데이터 준비 ─────────────────────────
@@ -207,26 +206,32 @@ sub_all = sub_all.copy()
 sub_all["cluster"] = labels
 clusters = sorted(sub_all["cluster"].unique())
 
-# ───────────────────────── 결과 그래프(가로 타일) ─────────────────────────
-result_figs = []
+# 공용: Matplotlib Figure → base64 PNG
+def fig_to_base64(fig) -> str:
+    buf = BytesIO()
+    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+# 공용: 가로 스크롤 컨테이너 스타일
+st.markdown("""
+<style>
+.scroll-x { overflow-x: auto; padding: 8px 0 10px; }
+.scroll-row { display: inline-flex; gap: 16px; }
+.scroll-row img { border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+.caption-center { text-align:center; color: #6b7280; font-size: 12px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ───────────────────────── 결과 그래프(가로 스크롤) ─────────────────────────
+main_figs = []
 
 # PCA 2D
 p2 = PCA(2, random_state=42).fit_transform(X)
-fig_pca = plt.figure(figsize=(4.6, 3.8))
+f = plt.figure(figsize=(5.2, 4.0))
 plt.scatter(p2[:, 0], p2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
-plt.title(f"{choice}: PCA 2D (k={k_final})")
-plt.xlabel("PC1"); plt.ylabel("PC2"); plt.tight_layout()
-result_figs.append(("PCA 2D", fig_pca))
-
-# t-SNE 2D (옵션)
-if show_tsne:
-    perp = min(perplexity, n - 1)
-    ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
-    fig_tsne = plt.figure(figsize=(4.6, 3.8))
-    plt.scatter(ts2[:, 0], ts2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
-    plt.title(f"{choice}: t-SNE 2D (k={k_final})")
-    plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
-    result_figs.append(("t-SNE 2D", fig_tsne))
+plt.title(f"{choice}: PCA 2D (k={k_final})"); plt.xlabel("PC1"); plt.ylabel("PC2"); plt.tight_layout()
+main_figs.append(fig_to_base64(f))
 
 # Radar(클러스터 평균, 0~1 정규화)
 mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
@@ -236,7 +241,7 @@ for c in num_pool:
     norm_means[c] = 0.5 if (pd.isna(mn) or pd.isna(mx) or mx == mn) else (norm_means[c] - mn) / (mx - mn)
 
 angles = [i / len(num_pool) * 2 * pi for i in range(len(num_pool))] + [0]
-fig_radar = plt.figure(figsize=(4.6, 3.8))
+f = plt.figure(figsize=(5.2, 4.0))
 ax = plt.subplot(111, polar=True)
 for i in clusters:
     vals = norm_means.loc[i].tolist(); vals.append(vals[0])
@@ -244,34 +249,34 @@ for i in clusters:
 ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
 plt.title(f"{choice}: Radar (k={k_final})")
 plt.legend(loc="upper right", bbox_to_anchor=(1.25, 1.05))
-result_figs.append(("Radar", fig_radar))
+main_figs.append(fig_to_base64(f))
 
-# 가로(타일) 배치 출력
-cols = st.columns(cols_per_row)
-for i, (_, fig) in enumerate(result_figs):
-    with cols[i % cols_per_row]:
-        st.pyplot(fig, use_container_width=True)
-    if (i + 1) % cols_per_row == 0 and (i + 1) < len(result_figs):
-        cols = st.columns(cols_per_row)
+# t-SNE 2D (옵션: 오른쪽에 추가)
+if show_tsne:
+    perp = min(perplexity, n - 1)
+    ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
+    f = plt.figure(figsize=(5.2, 4.0))
+    plt.scatter(ts2[:, 0], ts2[:, 1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+    plt.title(f"{choice}: t-SNE 2D (k={k_final})"); plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
+    main_figs.append(fig_to_base64(f))
 
-# (선택) PCA 3D는 화면 하단에 단독 표시
+# PCA 3D (옵션: 오른쪽에 추가)
 if show_pca3:
-    p3 = PCA(3, random_state=42).fit_transform(X)
     from mpl_toolkits.mplot3d import Axes3D  # noqa
-    fig3 = plt.figure(figsize=(6, 5))
-    ax3 = fig3.add_subplot(111, projection="3d")
+    p3 = PCA(3, random_state=42).fit_transform(X)
+    f = plt.figure(figsize=(5.6, 4.2))
+    ax3 = f.add_subplot(111, projection="3d")
     ax3.scatter(p3[:, 0], p3[:, 1], p3[:, 2], c=labels, cmap="tab10", s=50, edgecolors="k", alpha=0.85)
     ax3.set_title(f"{choice}: PCA 3D (k={k_final})")
     ax3.set_xlabel("PC1"); ax3.set_ylabel("PC2"); ax3.set_zlabel("PC3")
-    st.pyplot(fig3)
+    main_figs.append(fig_to_base64(f))
+
+# 출력: 메인 결과 가로 스크롤
+html_main = "".join([f"<img src='data:image/png;base64,{b}' height='320'/>" for b in main_figs])
+st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_main}</div></div>", unsafe_allow_html=True)
+st.markdown("<div class='caption-center'>좌우 스크롤로 모든 결과 그래프(PCA 2D, Radar, 옵션: t-SNE/PCA 3D)를 확인하세요.</div>", unsafe_allow_html=True)
 
 # ───────────────────────── 추가 프로파일(가로 스크롤) ─────────────────────────
-def fig_to_base64(fig) -> str:
-    buf = BytesIO()
-    fig.savefig(buf, format="png", dpi=160, bbox_inches="tight")
-    plt.close(fig)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
-
 if show_profiles:
     figs = []
 
@@ -280,14 +285,14 @@ if show_profiles:
         f = plt.figure(figsize=(6, 4))
         sns.boxplot(x="cluster", y=col, data=sub_all, palette="tab10")
         plt.title(f"{choice}: {col} by Cluster (k={k_final})")
-        figs.append(f)
+        figs.append(fig_to_base64(f))
 
     # 2) 범주 Count + Stacked(%) Bar (있을 때)
     if "CellBalance" in sub_all.columns:
         f = plt.figure(figsize=(6, 4))
         sns.countplot(x="cluster", hue="CellBalance", data=sub_all, palette="Set2")
         plt.title(f"{choice}: Count of CellBalance by Cluster")
-        figs.append(f)
+        figs.append(fig_to_base64(f))
 
         ctab_pct = pd.crosstab(sub_all["cluster"], sub_all["CellBalance"], normalize="index") * 100
         ctab_pct = ctab_pct.reindex(clusters, fill_value=0)
@@ -296,25 +301,16 @@ if show_profiles:
         ctab_pct.plot(kind="bar", stacked=True, colormap="Paired", ax=ax2)
         plt.title(f"{choice}: CellBalance Distribution (%) by Cluster")
         plt.tight_layout()
-        figs.append(f)
+        figs.append(fig_to_base64(f))
 
     # 3) Heatmap of means
     mean_matrix = sub_all.groupby("cluster")[num_pool].mean()
     f = plt.figure(figsize=(6, 4))
     sns.heatmap(mean_matrix, annot=True, cmap="coolwarm", fmt=".2f")
     plt.title(f"{choice}: Numeric Feature Means per Cluster")
-    figs.append(f)
+    figs.append(fig_to_base64(f))
 
-    # --- CSS + HTML: 가로 스크롤 컨테이너 ---
-    st.markdown("""
-    <style>
-    .scroll-x { overflow-x: auto; padding: 8px 4px 14px; }
-    .scroll-row { display: flex; gap: 16px; }
-    .scroll-row img { border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.12); }
-    </style>
-    """, unsafe_allow_html=True)
-
-    imgs = [fig_to_base64(f) for f in figs]
-    html_imgs = "".join([f"<img src='data:image/png;base64,{b}' height='300'/>" for b in imgs])
-    st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_imgs}</div></div>", unsafe_allow_html=True)
-    st.caption("※ 아래 가로 스크롤(드래그바)을 좌우로 움직여 모든 추가 프로파일을 확인하세요.")
+    # 출력: 추가 프로파일 가로 스크롤
+    html_prof = "".join([f"<img src='data:image/png;base64,{b}' height='300'/>" for b in figs])
+    st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_prof}</div></div>", unsafe_allow_html=True)
+    st.markdown("<div class='caption-center'>가로 스크롤(드래그바)을 좌우로 움직여 모든 추가 프로파일을 확인하세요.</div>", unsafe_allow_html=True)
