@@ -24,24 +24,39 @@ st.set_page_config(
 )
 st.markdown("""
 <style>
-  /* st.page_link로 만들어지는 링크 전반(텍스트만 밝게, 간격/라운드) */
+  /* 브랜드 텍스트(맨 위) */
+  [data-testid="stSidebar"] .brand{
+    font-weight: 900; font-size: 18px; letter-spacing: .6px;
+    color: #ffffff; margin: 4px 0 12px 2px;
+  }
+  [data-testid="stSidebar"] .menu-title{
+    color:#cfe0ff; margin: 6px 0 8px 0;
+  }
+
+  /* st.page_link로 생성된 링크의 텍스트를 '내부 요소까지' 밝게 강제 */
   [data-testid="stSidebar"] a[href]{
-    color:#ffffff !important;      /* 밝은 글자색 */
-    opacity:1 !important;          /* 흐림 제거 */
-    filter:none !important;        /* 혹시 남은 필터 제거 */
-    font-weight:700;               /* 굵게 */
-    display:block;
-    padding:10px 12px;
-    border-radius:10px;
+    color:#EAF2FF !important;        /* 링크 자체 색 */
+    opacity:1 !important;
+    display:block; padding:10px 12px; border-radius:10px; font-weight:700;
   }
-  /* 호버 시 배경만 살짝 강조, 텍스트는 더 화이트 */
+  /* 앵커 내부의 p/span/div에도 동일 색/불투명도 상속 강제 */
+  [data-testid="stSidebar"] a[href] *{
+    color:inherit !important;
+    opacity:1 !important;
+    filter:none !important;
+  }
+
+  /* 호버/선택 상태는 배경만 살짝 강조 */
   [data-testid="stSidebar"] a[href]:hover{
-    background:#13233b !important;
-    color:#ffffff !important;
+    background:#13233b !important; color:#ffffff !important;
   }
-  /* 섹션 타이틀/보조 텍스트 색감 */
-  [data-testid="stSidebar"] .menu-section-title{ color:#cfe0ff; font-weight:800; }
-  [data-testid="stSidebar"] .menu-caption{ color:#9fb2cf; }
+  [data-testid="stSidebar"] a[aria-current="page"]{
+    background:#1c2e4a !important; color:#ffffff !important;
+    box-shadow: inset 0 0 0 1px #273b5c;
+  }
+  [data-testid="stSidebar"] a[aria-current="page"] *{
+    color:inherit !important; opacity:1 !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -138,14 +153,6 @@ with st.sidebar:
     st.page_link("pages/4_recommend_system.py",     label="기업 추천",    icon="✨")
     st.page_link("pages/5_forest_lstm.py",          label="이상거래 의심",         icon="🌳")
     st.page_link("pages/5_timeseries_analysis.py",  label="시세 분석", icon="📈")
-
-    st.divider()
-    st.caption("CSV 업로드(미리보기용)")
-    up = st.file_uploader(" ", type="csv")
-    if up:
-        tmp_df = pd.read_csv(up, nrows=100)
-        st.success("업로드 파일 미리보기 (100행)")
-        st.dataframe(tmp_df, use_container_width=True)
 
 # ───────────────────── 데이터 유무 방어 ─────────────────────
 if df is None or ("계약일" not in df.columns):
