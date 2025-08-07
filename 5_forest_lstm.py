@@ -488,6 +488,7 @@ st.plotly_chart(fig_anom, use_container_width=True)
 
 # ───────────────────── 11) 이상치 리스트 출력 ─────────────────────
 anom_df = df_feat[df_feat["final_score"] >= threshold]
+anom_df = anom_df.loc[:, ~anom_df.columns.duplicated()]
 cols = ["계약번호", "계약일", "판매업체", "구매업체", "제품구분", "배터리종류", "final_score"]
 cols = [c for c in cols if c in anom_df.columns] + ["final_score"]  # 안전 필터
 top_anom = anom_df[cols].sort_values("final_score", ascending=False)
