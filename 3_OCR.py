@@ -47,39 +47,46 @@ def normalize_text(s: str) -> str:
     return unicodedata.normalize("NFC", s)
 
 
+# ------------------------------
+# 📚  헬퍼 함수 (교체본)
+# ------------------------------
 def extract_info(lines):
-    """OCR 라인 리스트에서 사업자등록정보 추출"""
+    """
+    EasyOCR로 얻은 lines 리스트에서
+    · b_no   : 10자리(또는 3-2-5) 사업자등록번호
+    · start_dt : 개업 연월일(YYYYMMDD)
+    · p_nm   : 대표자/성명
+    를 뽑아 낸다.
+    """
+    txt = normalize_text(" ".join(lines))   # 모든 라인 붙여서 검색
+
     info = {"b_no": None, "start_dt": None, "p_nm": None}
-    no_space = [l.replace(" ", "") for l in lines]
 
-    for i, line in enumerate(lines):
-        # 등록번호
-        if info["b_no"] is None:
-            m = B_NO_REGEX.search(line)
-            if m:
-                info["b_no"] = m.group().replace("-", "")
+    # 1) 사업자번호 ― 3-2-5 또는 10자리
+    m = re.search(r"\d{3}-\d{2}-\d{5}|\d{10}", txt)
+    if m:
+        info["b_no"] = m.group().replace("-", "")
 
-        # 대표자
-        if info["p_nm"] is None and "대표자" in no_space[i]:
-            for j in range(i + 1, len(lines)):
-                candidate = normalize_text(lines[j])
-                if candidate:
-                    info["p_nm"] = candidate
-                    break
+    # 2) 개업연월일
+    #   “개업 년월일 : 2014 년 12 월 10 일” 같은 패턴 우선 탐색
+    m = re.search(
+        r"개업[^0-9]{0,10}"
+        r"(\d{4})[.\-년 ]+(\d{1,2})[.\-월 ]+(\d{1,2})",
+        txt,
+    )
+    #   없으면 이미지 전체에서 날짜 패턴만 다시 탐색 (가장 앞에 나오는 것)
+    if not m:
+        m = re.search(r"(\d{4})[.\-년 ]+(\d{1,2})[.\-월 ]+(\d{1,2})", txt)
+    if m:
+        y, mth, d = m.groups()
+        info["start_dt"] = f"{y}{int(mth):02d}{int(d):02d}"
 
-        # 개업연월일
-        if (
-            info["start_dt"] is None
-            and any(tag in no_space[i] for tag in ("개업", "개업연월일", "개업일자"))
-        ):
-            window = " ".join(lines[i : i + 6])
-            m = DATE_REGEX.search(window)
-            if m:
-                y, mth, d = m.groups()
-                info["start_dt"] = f"{y}{int(mth):02d}{int(d):02d}"
+    # 3) 대표자 / 성명
+    m = re.search(r"(대표자|성\s*명)[ :]*([가-힣]{2,10})", txt)
+    if m:
+        info["p_nm"] = m.group(2)
 
     return info
-
 
 def ocr_image(file) -> list[str]:
     """업로드된 이미지 파일에서 OCR 수행 후 텍스트 라인 반환"""
