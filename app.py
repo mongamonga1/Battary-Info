@@ -206,6 +206,9 @@ def render_home():
             .reset_index()
         )
         fig_line = px.line(monthly_cnt, x="계약일", y="count", markers=True)
+        fig_line.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=360)
+        st.plotly_chart(fig_line, use_container_width=True, config={"displayModeBar": False})
+        st.markdown("</div>", unsafe_allow_html=True)   # ← div 닫기
 
 st.markdown(
     """
