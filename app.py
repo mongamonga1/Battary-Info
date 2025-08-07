@@ -31,7 +31,7 @@ PAGES = {
     "reco": ROOT / "pages/4_recommend_system.py",
     "fraud": ROOT / "5_forest_lstm.py",
     "timeseries": ROOT / "pages/5_timeseries_analysis.py",
-    "ocr":    ROOT /3_OCR.py", 
+    "ocr":    ROOT /"3_OCR.py", 
 }
 
 # 일부 페이지가 없더라도 앱은 계속 동작하게 경고만
