@@ -19,12 +19,6 @@ from openpyxl.styles import Font
 # ------------------------------  ⚙️  기본 설정  ------------------------------
 st.set_page_config(page_title="사업자등록증 OCR & 진위확인", layout="centered")
 
-# ★★ [추가] EasyOCR Reader를 세션에 프리로드 ──────────────────────────
-if "ocr_reader" not in st.session_state:
-    with st.spinner("🔄 EasyOCR 모델을 불러오는 중입니다... (최초 10-20초 소요)"):
-        st.session_state["ocr_reader"] = get_reader()
-# ────────────────────────────────────────────────────────────────────────────
-
 LANGS = ["ko", "en"]  # EasyOCR 언어 설정
 DATE_REGEX = re.compile(r"(\d{4})[.\-년 ]+(\d{1,2})[.\-월 ]+(\d{1,2})")
 B_NO_REGEX = re.compile(r"\d{3}-\d{2}-\d{5}|\d{10}")
@@ -161,7 +155,10 @@ def to_colored_excel(df: pd.DataFrame) -> bytes:
     wb.save(out)
     out.seek(0)
     return out.read()
-
+    
+if "ocr_reader" not in st.session_state:
+    with st.spinner("🔄 EasyOCR 모델을 불러오는 중입니다... (최초 10-20초 소요)"):
+        st.session_state["ocr_reader"] = get_reader()
 # ------------------------------
 # 🖼  UI 구성
 # ------------------------------
