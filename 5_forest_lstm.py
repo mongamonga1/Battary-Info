@@ -490,7 +490,7 @@ st.plotly_chart(fig_anom, use_container_width=True)
 anom_df = df_feat[df_feat["final_score"] >= threshold]
 anom_df = anom_df.loc[:, ~anom_df.columns.duplicated()]
 cols = ["계약번호", "계약일", "판매업체", "구매업체", "제품구분", "배터리종류", "final_score"]
-cols = [c for c in cols if c in anom_df.columns] + ["final_score"]  # 안전 필터
+cols = [c for c in cols if c in anom_df.columns]
 top_anom = anom_df[cols].sort_values("final_score", ascending=False)
 
 st.subheader(f"🚨 Top {int(CONTAMINATION*100)}% 이상치 리스트 ({len(top_anom)}건)")
