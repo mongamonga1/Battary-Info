@@ -167,6 +167,9 @@ with img_tab:
         type=["png", "jpg", "jpeg"],
         accept_multiple_files=True,
     )
+    # ① -------------- 디버깅 토글 추가 --------------
+    debug = st.checkbox("🔍 OCR 원본 라인 보기", value=False)
+    # ------------------------------------------------
     if images:
         rows = []
         with st.spinner("🔍 OCR 분석 중..."):
@@ -189,6 +192,9 @@ with img_tab:
 
 with file_tab:
     data_file = st.file_uploader("✅ 사업자 정보가 담긴 CSV 또는 XLSX", type=["csv", "xlsx"])
+    # ③ -------------- 디버깅 토글 추가 --------------
+    debug2 = st.checkbox("🔍 OCR 원본(샘플) 보기", value=False)
+    # ------------------------------------------------
     if data_file is not None:
         df = (
             pd.read_csv(data_file) if data_file.name.endswith(".csv") else pd.read_excel(data_file)
