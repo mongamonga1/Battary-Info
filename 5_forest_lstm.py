@@ -452,6 +452,9 @@ else:
     lstm_df = pd.DataFrame(columns=["row_index","lstm_loss","lstm_score_norm","판매업체"])
 
 # ----------------------------- 9) 최종 점수 결합 -----------------------------
+if "final_score" in df_feat.columns:
+    df_feat = df_feat.drop(columns=["final_score"])
+    
 def combine_scores(a, b):
     if pd.isna(b):
         return a
