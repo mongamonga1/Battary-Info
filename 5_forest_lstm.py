@@ -454,14 +454,15 @@ else:
 # ----------------------------- 9) 최종 점수 결합 -----------------------------
 if "final_score" in df_feat.columns:
     df_feat = df_feat.drop(columns=["final_score"])
-    
+# --------------------------------------------------------------------------
 def combine_scores(a, b):
     if pd.isna(b):
         return a
     return max(0.6*a, 0.4*b)
 
-df_feat["final_score"] = [combine_scores(a, b) for a, b in zip(df_feat["if_score_norm"], df_feat["lstm_score_norm"])]
-
+df_feat["final_score"] = [
+    combine_scores(a, b) for a, b in zip(df_feat["if_score_norm"], df_feat["lstm_score_norm"])
+]
 # ───────────────────── 10) Plotly 시각화 ─────────────────────
 threshold = df_feat["final_score"].quantile(1 - CONTAMINATION)
 df_feat["anomaly"] = df_feat["final_score"] >= threshold
