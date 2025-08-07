@@ -31,6 +31,7 @@ PAGES = {
     "reco": ROOT / "pages/4_recommend_system.py",
     "fraud": ROOT / "5_forest_lstm.py",
     "timeseries": ROOT / "pages/5_timeseries_analysis.py",
+    "ocr":    ROOT / "pages/3_OCR.py", 
 }
 
 # 일부 페이지가 없더라도 앱은 계속 동작하게 경고만
@@ -553,9 +554,10 @@ pg_kmeans = st.Page(str(PAGES["kmeans"]), title="🚗 차명별 군집분석", u
 pg_reco = st.Page(str(PAGES["reco"]), title="✨ 기업 추천", url_path="reco")
 pg_fraud = st.Page(str(PAGES["fraud"]), title="🌳 이상거래 의심", url_path="fraud")
 pg_ts = st.Page(str(PAGES["timeseries"]), title="📈 시세 분석", url_path="timeseries")
+pg_ocr = st.Page(str(PAGES["ocr"]), title="📄 OCR 추출", url_path="ocr") 
 
 # 숨김 내비 생성
-current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ts], position="hidden")
+current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ocr, pg_ts], position="hidden")
 
 # ───────────────────── 사이드바(공통) ─────────────────────
 with st.sidebar:
@@ -582,6 +584,7 @@ with st.sidebar:
 
     # 3) 이상거래 의심 — 그룹 밖에 단독 배치
     st.page_link(pg_fraud, label="이상거래 의심", icon="🌳")
+    st.page_link(pg_ocr,   label="OCR", icon="📄")
 
 st.markdown(
     """
