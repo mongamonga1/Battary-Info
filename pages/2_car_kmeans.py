@@ -279,6 +279,17 @@ show_pca3     = st.sidebar.checkbox("PCA 3D 추가", value=False)
 perplexity    = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
 show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", value=True)
 
+# 💸 비용 옵션 (최소 과금 구조)
+st.sidebar.markdown("### 💸 비용 옵션")
+cost_saver   = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
+DEFAULT_MODEL = "gpt-4o-mini"
+_api_key, _model_from_secret = get_openai_conf()
+MODEL_NAME   = _model_from_secret or DEFAULT_MODEL
+TEMPERATURE  = st.sidebar.slider("요약 temperature", 0.0, 1.0, 0.2, 0.05)
+MAX_TOKENS   = 320 if cost_saver else 600
+if _api_key: st.sidebar.success(f"✅ GPT 사용 가능 (모델: {MODEL_NAME})")
+else:        st.sidebar.warning("🔒 OPENAI_API_KEY 미설정 → 로컬 요약으로 대체")
+    
 # ───────────────────────────── 모델 데이터 준비 ─────────────────────────────
 sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
 n = len(sub_all)
