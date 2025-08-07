@@ -16,10 +16,14 @@ from PIL import Image
 from openpyxl import load_workbook
 from openpyxl.styles import Font
 
-# ------------------------------
-# ⚙️  기본 설정
-# ------------------------------
+# ------------------------------  ⚙️  기본 설정  ------------------------------
 st.set_page_config(page_title="사업자등록증 OCR & 진위확인", layout="centered")
+
+# ★★ [추가] EasyOCR Reader를 세션에 프리로드 ──────────────────────────
+if "ocr_reader" not in st.session_state:
+    with st.spinner("🔄 EasyOCR 모델을 불러오는 중입니다... (최초 10-20초 소요)"):
+        st.session_state["ocr_reader"] = get_reader()
+# ────────────────────────────────────────────────────────────────────────────
 
 LANGS = ["ko", "en"]  # EasyOCR 언어 설정
 DATE_REGEX = re.compile(r"(\d{4})[.\-년 ]+(\d{1,2})[.\-월 ]+(\d{1,2})")
@@ -88,7 +92,7 @@ def extract_info(lines):
 def ocr_image(file) -> list[str]:
     """업로드된 이미지 파일에서 OCR 수행 후 텍스트 라인 반환"""
     img = Image.open(file)
-    reader = get_reader()
+    reader = st.session_state["ocr_reader"]
     result = reader.readtext(np.array(img))
     return [text for _, text, _ in result]
 
