@@ -280,8 +280,6 @@ perplexity    = st.sidebar.slider("t-SNE perplexity", 5, 50, 30, 1)
 show_profiles = st.sidebar.checkbox("추가 프로파일(가로 스크롤)", value=True)
 
 # 💸 비용 옵션 (최소 과금 구조)
-st.sidebar.markdown("### 💸 비용 옵션")
-cost_saver   = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 응답)", value=True)
 DEFAULT_MODEL = "gpt-4o-mini"
 _api_key, _model_from_secret = get_openai_conf()
 MODEL_NAME   = _model_from_secret or DEFAULT_MODEL
