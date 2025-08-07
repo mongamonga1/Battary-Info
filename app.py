@@ -200,13 +200,12 @@ def render_home():
             pd.to_datetime(df["계약일"])
             .to_frame(name="계약일")
             .set_index("계약일")
-            .resample("ME")  # ← 'M' 대신 'ME' (FutureWarning 대응)
+            .resample("ME") 
             .size()
             .rename("count")
             .reset_index()
         )
         fig_line = px.line(monthly_cnt, x="계약일", y="count", markers=True)
-        fig_"사업자 판독", icon="📝")
 
 st.markdown(
     """
