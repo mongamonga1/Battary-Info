@@ -206,7 +206,7 @@ def render_home():
             .reset_index()
         )
         fig_line = px.line(monthly_cnt, x="계약일", y="count", markers=True)
-        fig_자 판독", icon="📝")
+        fig_"사업자 판독", icon="📝")
 
 st.markdown(
     """
