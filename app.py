@@ -28,7 +28,7 @@ st.set_page_config(
 ROOT = Path(__file__).parent
 PAGES = {
     "kmeans": ROOT / "pages/2_car_kmeans.py",
-    "ocr":    ROOT / "pages/3_OCR.py",
+    "ocr":    ROOT / "3_OCR.py",
     "reco": ROOT / "pages/4_recommend_system.py",
     "fraud": ROOT / "5_forest_lstm.py",
     "timeseries": ROOT / "pages/5_timeseries_analysis.py",
