@@ -221,3 +221,48 @@ st.info(
     "- ⏱ EasyOCR 최초 실행은 수 초가 걸릴 수 있습니다.\n"
     "- 💡 국세청 API는 초당 5회 이하로 호출하세요."
 )
+
+# ───────────────────── 공통 사이드바 (브랜드 · 메뉴 · CSS) ─────────────────────
+def render_common_sidebar():
+    with st.sidebar:
+        # ── 브랜드 로고 / 제목
+        st.markdown(
+            '<div style="position:sticky;top:0;z-index:10;background:#0f1b2d;padding:12px 12px 6px;'
+            'margin:0 -8px 8px -8px;border-bottom:1px solid rgba(255,255,255,.06);">'
+            '<div style="font-weight:900;font-size:24px;letter-spacing:.8px;'
+            'color:#fff;line-height:1.2;">BATTERY-INFO</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # 1) 메인 화면
+        st.page_link(label="메인 화면", url_path="", icon="🏠")
+
+        st.markdown("<div style='height:6px;'></div>", unsafe_allow_html=True)
+
+        # 2) 분석 결과
+        with st.expander("분석 결과 확인", expanded=True):
+            st.page_link(url_path="kmeans", title="🚗 차명별 군집분석", label="군집 분석", icon="🚗")
+            st.page_link(url_path="reco",   title="✨ 기업 추천",     label="기업 추천", icon="✨")
+            st.page_link(url_path="timeseries", title="📈 시세 분석", label="시세 분석", icon="📈")
+
+        # 3) 이상거래 / OCR
+        st.page_link(url_path="fraud", title="🌳 이상거래 의심", label="이상거래 의심", icon="🌳")
+        st.page_link(url_path="ocr",   title="📄 OCR 추출",   label="OCR",         icon="📄")
+
+    # ── 사이드바 링크 색상·가시성 보정 CSS
+    st.markdown(
+        """
+        <style>
+          section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
+          section[data-testid="stSidebar"] [data-testid^="stPageLink"] span {
+            color:#EAF2FF !important; opacity:1 !important;
+          }
+          section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span {
+            color:#FFFFFF !important;
+          }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+# ────────────────────────────────────────────────────────────────────────────
