@@ -284,6 +284,7 @@ df_train = df[train_mask].copy()
 
 # ----------------------------- 6) 피처링 -----------------------------
 df_feat = df.copy()
+df_feat = df_feat.loc[:, ~df_feat.columns.duplicated()]
 
 # 범주 빈도(훈련기간 기준) → 전체에 매핑
 cat_cols = ["판매업체", "구매업체", "제품구분", "배터리종류", "지급형태"]
