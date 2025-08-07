@@ -218,38 +218,40 @@ def render_home():
             df2["변동"] = pd.to_numeric(df2["개당가격"], errors="coerce").pct_change(fill_method=None).fillna(0)
             df2["변동_clamped"] = df2["변동"].clip(lower=-0.20, upper=0.40)
             label_col = next((c for c in ["배터리종류", "모델", "차종", "판매업체"] if c in df2.columns), df2.columns[0])
-            top_issue = (
-                df2.tail(40)
-                .nlargest(6, "변동")
-                .assign(
-                    change=lambda d: (d["변동"] * 100).round(2),
-                    price=lambda d: d["개당가격"].map(lambda x: f"₩ {x:,.0f}"),
-                )
+
+        top_issue = (
+            df2.tail(40)
+               .nlargest(6, "변동")          # 여전히 “가장 큰 상승” 행을 고르되
+               .assign(
+                   change=lambda d: (d["변동_clamped"] * 100).round(2),  # ← 여기만 바뀜
+                   price=lambda d: d["개당가격"].map(lambda x: f"₩ {x:,.0f}"),
+               )
+        )
+        low_issue = (
+            df2.tail(40)
+               .nsmallest(6, "변동")        # 가장 큰 하락
+               .assign(
+                   change=lambda d: (d["변동_clamped"] * 100).round(2),
+                   price=lambda d: d["개당가격"].map(lambda x: f"₩ {x:,.0f}"),
+               )
+        )
+
+        issue = pd.concat([top_issue, low_issue]).head(9)
+        for _, r in issue.iterrows():
+            arrow = "🔺" if r["change"] >= 0 else "🔻"
+            color = "#10b981" if r["change"] >= 0 else "#ef4444"
+            st.markdown(
+                f"""
+                <div style="display:flex;justify-content:space-between;padding:8px 6px;border-bottom:1px solid #f0f3f7;">
+                  <div style="font-weight:600;">{r[label_col]}</div>
+                  <div style="font-variant-numeric: tabular-nums;">
+                    <span style="margin-right:10px;color:#64748b;">{r['price']}</span>
+                    <span style="color:{color};">{arrow} {abs(r['change']):.2f}%</span>
+                  </div>
+                </div>
+                """,
+                unsafe_allow_html=True,
             )
-            low_issue = (
-                df2.tail(40)
-                .nsmallest(6, "변동")
-                .assign(
-                    change=lambda d: (d["변동"] * 100).round(2),
-                    price=lambda d: d["개당가격"].map(lambda x: f"₩ {x:,.0f}"),
-                )
-            )
-            issue = pd.concat([top_issue, low_issue]).head(9)
-            for _, r in issue.iterrows():
-                arrow = "🔺" if r["change"] >= 0 else "🔻"
-                color = "#10b981" if r["change"] >= 0 else "#ef4444"
-                st.markdown(
-                    f"""
-                    <div style="display:flex;justify-content:space-between;padding:8px 6px;border-bottom:1px solid #f0f3f7;">
-                      <div style="font-weight:600;">{r[label_col]}</div>
-                      <div style="font-variant-numeric: tabular-nums;">
-                        <span style="margin-right:10px;color:#64748b;">{r['price']}</span>
-                        <span style="color:{color};">{arrow} {abs(r['change']):.2f}%</span>
-                      </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
         else:
             st.info("가격 컬럼이 없어 최근 거래 기준의 단순 목록만 표시합니다.")
             for s in df.head(9).index:
