@@ -65,7 +65,7 @@ def render_ai_secretary():
             key="sources"
         )
     with opt3:
-        depth = st.slider("근거 강도)", 1, 5, 3, key="depth")
+        depth = st.slider("근거 강도", 1, 5, 3, key="depth")
 
     # ── 실행/초기화 ──
     def clear_query():
