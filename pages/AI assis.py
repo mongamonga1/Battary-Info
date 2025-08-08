@@ -4,41 +4,56 @@ import streamlit as st
 # ── 다른 페이지와 동일한 사이드바/배경 테마 (이 파일에서만 주입)
 st.markdown("""
 <style>
-  /* === page_link 아이콘+텍스트 한 줄 고정 & 간격 축소 === */
-  /* 모든 page_link(a[href])를 flex row로 강제하고 줄바꿈 방지 */
-  section[data-testid="stSidebar"] a[href]{
-    display:flex !important;
-    flex-direction:row !important;
-    align-items:center !important;
-    gap:8px !important;                /* 아이콘-텍스트 간격 */
-    white-space:nowrap !important;      /* 줄바꿈 금지 */
-    line-height:1.15 !important;        /* 세로 높이 줄이기 */
-    padding:8px 10px !important;        /* 기본 10→8로 축소 */
-    margin:2px 6px !important;          /* 링크 사이 간격 축소 */
+  /* === 색상 오버라이드: 목표 이미지와 동일한 톤 === */
+
+  /* 사이드바 전체 배경/기본 글자색 */
+  section[data-testid="stSidebar"]{
+    background:#0f1b2d !important;    /* 딥 블루 배경 */
+    color:#EAF2FF !important;          /* 기본 글자색 */
   }
-  /* 내부 텍스트 span도 줄바꿈 금지 */
+
+  /* 모든 링크(메뉴) 글자/아이콘 색 */
+  section[data-testid="stSidebar"] a[href],
   section[data-testid="stSidebar"] a[href] span{
-    white-space:nowrap !important;
+    color:#EAF2FF !important;
+    opacity:1 !important;
   }
-  /* 선택된 항목(현재 페이지)도 동일 높이 유지 */
+
+  /* Hover/선택 상태 색 */
+  section[data-testid="stSidebar"] a[href]:hover{
+    background:#13233b !important;
+    color:#ffffff !important;
+  }
   section[data-testid="stSidebar"] a[aria-current="page"]{
-    padding:8px 10px !important;
-    margin:2px 6px !important;
+    background:#1c2e4a !important;
+    color:#ffffff !important;
+    box-shadow: inset 0 0 0 1px #273b5c !important;
+  }
+  section[data-testid="stSidebar"] a[aria-current="page"] span{
+    color:#ffffff !important;
   }
 
-  /* === Expander(분석 결과 확인) 안쪽 링크 간격도 동일하게 === */
+  /* Expander 헤더(분석 결과 확인) – 밝은 pill + 진한 글자 */
+  section[data-testid="stSidebar"] details > summary{
+    background:#ffffff !important;
+    color:#0f172a !important;          /* 헤더 텍스트 */
+    border:1px solid rgba(255,255,255,.22) !important;
+  }
+
+  /* Expander 본문 박스 – 어두운 배경 + 밝은 글자 */
   section[data-testid="stSidebar"] details[open] > div[role="group"]{
-    padding:8px 4px 6px 4px !important;  /* 박스 안쪽 여백 살짝만 */
+    background:rgba(255,255,255,.06) !important;  /* 목표 이미지 같은 톤 */
+    border:1px solid rgba(255,255,255,.10) !important;
+    border-radius:14px !important;
   }
-  section[data-testid="stSidebar"] details[open] > div[role="group"] a[href]{
-    margin:2px 6px !important;
-    padding:8px 10px !important;
+  section[data-testid="stSidebar"] details[open] > div[role="group"] a[href],
+  section[data-testid="stSidebar"] details[open] > div[role="group"] a[href] span{
+    color:#EAF2FF !important;          /* 내부 메뉴 글자 */
   }
 
-  /* 아이콘 이모지의 수직 정렬 깔끔하게 */
-  section[data-testid="stSidebar"] a[href] svg,
-  section[data-testid="stSidebar"] a[href] img {
-    vertical-align:middle !important;
+  /* OCR/AI 정책지원비서 같은 단독 버튼도 동일한 색 유지 */
+  section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span{
+    color:#EAF2FF !important;
   }
 </style>
 """, unsafe_allow_html=True)
