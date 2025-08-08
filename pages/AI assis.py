@@ -40,10 +40,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 페이지 내용(빈 상태 OK) ---
-st.title("🤖 AI 정책지원비서")
-st.info("페이지 전환만 구현되어 있습니다. (기능은 추후 연결)")
-
 def render_ai_secretary():
 
     # 홈과 동일한 톤 유지 (사이드바/배경 CSS)
@@ -159,3 +155,5 @@ def render_ai_secretary():
         st.caption("※ 모든 수치/근거는 데모용 모의 값입니다. 실제 분석엔 내부/외부 데이터 파이프라인과 모델을 연결하세요.")
     else:
         st.info("왼쪽의 **빠른 질문 버튼**을 누르거나 텍스트를 작성한 뒤 **분석 실행**을 클릭하세요.")
+
+render_ai_secretary()
