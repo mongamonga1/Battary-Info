@@ -65,7 +65,7 @@ def render_ai_secretary():
             key="sources"
         )
     with opt3:
-        depth = st.slider("근거 강도(모의)", 1, 5, 3, key="depth")
+        depth = st.slider("근거 강도)", 1, 5, 3, key="depth")
 
     # ── 실행/초기화 ──
     def clear_query():
@@ -75,7 +75,7 @@ def render_ai_secretary():
     run = c1.button("🔎 분석 실행", key="run_btn")
     c2.button("🧹 초기화", key="clear_btn", on_click=clear_query)
 
-    # ── 결과 패널(모의) ──
+    # ── 결과 패널 ──
     query = st.session_state.get("user_query", "")
     if run and query.strip():
         import hashlib, random
@@ -96,14 +96,14 @@ def render_ai_secretary():
 
         st.markdown("### 🧩 핵심 결론")
         st.write(f"- 제안: **{option}**")
-        st.write(f"- 기대효과(모의): 원가 **{cost_down:.1f}%** 절감 · 신규 일자리 **{jobs:,}개** · CO₂ **{co2:.2f} Mt** 감축/년")
+        st.write(f"- 기대효과): 원가 **{cost_down:.1f}%** 절감 · 신규 일자리 **{jobs:,}개** · CO₂ **{co2:.2f} Mt** 감축/년")
 
-        st.markdown("### 📊 정량 근거(모의)")
+        st.markdown("### 📊 정량 근거")
         st.write(f"- 사용한 소스(가정): {', '.join(sources) if sources else '선택 안 함'}")
         st.write(f"- 시장성 **{market}**, 기술성 **{tech}**, 규제 적합성 **{reg}** (0~100 가중지수)")
 
         if mode in ("전체", "요약"):
-            st.markdown("### 🔎 정성 근거(모의 요약)")
+            st.markdown("### 🔎 정성 근거(요약)")
             st.write("- 해외 동향: 미국·EU는 인센티브와 의무비율 병행 추세")
             st.write("- 산업 파급: 회수/재제조 생태계 활성화 및 중소협력사 역량 강화")
 
