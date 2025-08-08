@@ -1,71 +1,39 @@
-# pages/ai_secretary.py  (예시)
+# pages/AI assis.py
 import streamlit as st
-st.set_page_config(
-    page_title="AI 정책지원비서",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
-# 👉 홈과 동일한 사이드바/배경 스타일 주입
+# (선택) 홈과 동일한 스타일 유지
 st.markdown("""
 <style>
   [data-testid="stAppViewContainer"] { background: #f6f8fb; }
   [data-testid="stHeader"] { background: rgba(246,248,251,0.7); backdrop-filter: blur(6px); }
   [data-testid="stSidebar"] { background: #0f1b2d; color: #d7e1f2; }
   [data-testid="stSidebar"] * { font-weight: 500; }
-
-  /* 사이드바 링크 스타일 (홈과 동일) */
-  [data-testid="stSidebar"] a[href]{
-    color:#EAF2FF !important; opacity:1 !important;
-    display:block; padding:10px 12px; border-radius:10px; font-weight:700;
-  }
-  [data-testid="stSidebar"] a[href]:hover{
-    background:#13233b !important; color:#ffffff !important;
-  }
-  [data-testid="stSidebar"] a[aria-current="page"]{
-    background:#1c2e4a !important; color:#ffffff !important;
-    box-shadow: inset 0 0 0 1px #273b5c;
-  }
-
-  /* page_link 글자색 고정 (메인 파일 하단 CSS와 동일) */
+  [data-testid="stSidebar"] a[href]{ color:#EAF2FF !important; opacity:1 !important;
+    display:block; padding:10px 12px; border-radius:10px; font-weight:700; }
+  [data-testid="stSidebar"] a[href]:hover{ background:#13233b !important; color:#ffffff !important; }
+  [data-testid="stSidebar"] a[aria-current="page"]{ background:#1c2e4a !important; color:#ffffff !important;
+    box-shadow: inset 0 0 0 1px #273b5c; }
   section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
-  section[data-testid="stSidebar"] [data-testid^="stPageLink"] span {
-    color:#EAF2FF !important; opacity:1 !important;
-  }
+  section[data-testid="stSidebar"] [data-testid^="stPageLink"] span { color:#EAF2FF !important; opacity:1 !important; }
   section[data-testid="stSidebar"]
-  [data-testid="stBaseButton-secondary"][aria-current="page"] span {
-    color:#FFFFFF !important;
-  }
+  [data-testid="stBaseButton-secondary"][aria-current="page"] span { color:#FFFFFF !important; }
 </style>
 """, unsafe_allow_html=True)
 
+
 def render_ai_secretary():
-
-    # 홈과 동일한 톤 유지 (사이드바/배경 CSS)
-    st.markdown("""
-    <style>
-      [data-testid="stAppViewContainer"]{background:#f6f8fb;}
-      [data-testid="stHeader"]{background:rgba(246,248,251,.7);backdrop-filter:blur(6px);}
-      [data-testid="stSidebar"]{background:#0f1b2d;color:#d7e1f2;}
-      [data-testid="stSidebar"] * {font-weight:500;}
-      [data-testid="stSidebar"] a[href]{color:#EAF2FF!important;opacity:1!important;display:block;padding:10px 12px;border-radius:10px;font-weight:700;}
-      [data-testid="stSidebar"] a[href]:hover{background:#13233b!important;color:#fff!important;}
-      [data-testid="stSidebar"] a[aria-current="page"]{background:#1c2e4a!important;color:#fff!important;box-shadow:inset 0 0 0 1px #273b5c;}
-      section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
-      section[data-testid="stSidebar"] [data-testid^="stPageLink"] span {color:#EAF2FF!important;opacity:1!important;}
-      section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span{color:#fff!important;}
-    </style>
-    """, unsafe_allow_html=True)
-
     st.title("🤖 AI 정책지원비서")
     st.caption("프로토타입: 버튼 중심 상호작용 · 실제 웹연동/모델 분석은 미구현")
 
-    # --- 빠른 질문(버튼만으로 입력 채우기) ---
-    st.text_area("궁금한 점을 적어주세요",
-    key="user_query",
-    value=st.session_state.get("user_query", ""),
-    placeholder="예) 전기차 배터리 재활용 의무비율을 어떻게 설정해야 하나요?")
+    # ── 질문 입력(한 번만 생성) ──
+    st.text_area(
+        "궁금한 점을 적어주세요",
+        key="user_query",
+        value=st.session_state.get("user_query", ""),
+        placeholder="예) 전기차 배터리 재활용 의무비율을 어떻게 설정해야 하나요?"
+    )
+
+    # ── 빠른 질문 버튼(중복 금지 & 고유 key) ──
     st.markdown("**빠른 질문**")
 
     def set_query(q: str):
@@ -79,64 +47,41 @@ def render_ai_secretary():
         "ESS 안전기준 강화의 비용·효과는?",
         "배터리 국산화율 제고 방안은?",
         "탄소국경조정제도 대응 전략은?",
-        "중고 배터리 거래 투명성 제고?" ]
-    for i, q in enumerate(quicks):
-        qcols[i % 6].button(f"#{i+1}", on_click=set_query, args=(q,))
-    def clear_query():
-        st.session_state["user_query"] = ""
-        st.rerun()
-
-    c1, c2, c3 = st.columns([1, 1, 5])
-    run = c1.button("🔎 분석 실행")
-    c2.button("🧹 초기화", on_click=clear_query)
-
-    st.markdown("**빠른 질문**")
-    qcols = st.columns(6)
-    quicks = [
-        "배터리 재활용 의무비율 몇 %가 적절할까?",
-        "전기차 보조금 구조 개편 방향은?",
-        "ESS 안전기준 강화의 비용·효과는?",
-        "배터리 국산화율 제고 방안은?",
-        "탄소국경조정제도 대응 전략은?",
         "중고 배터리 거래 투명성 제고?"
     ]
     for i, q in enumerate(quicks):
-        if qcols[i % 6].button(f"#{i+1}"):
-            st.session_state.user_query = q
+        qcols[i % 6].button(f"#{i+1}", key=f"quick_{i}", on_click=set_query, args=(q,))
 
     st.markdown("<div class='blank'></div>", unsafe_allow_html=True)
 
-    # --- 입력 영역 (텍스트는 있지만 실행은 버튼으로) ---
-    st.text_area(
-        "궁금한 점을 적어주세요",
-        key="user_query",
-        placeholder="예) 전기차 배터리 재활용 의무비율을 어떻게 설정해야 하나요?"
-    )
-
+    # ── 옵션들 ──
     opt1, opt2, opt3 = st.columns([1.2, 1.2, 1])
     with opt1:
-        mode = st.radio("분석 모드", ["전체", "요약", "리스크", "대안"], horizontal=True)
+        mode = st.radio("분석 모드", ["전체", "요약", "리스크", "대안"], key="mode", horizontal=True)
     with opt2:
         sources = st.multiselect(
             "데이터 소스(가정)",
             ["시세 데이터", "이상거래 탐지", "군집분석", "OCR 문서", "외부(통계/특허/논문)"],
-            default=["시세 데이터", "군집분석", "외부(통계/특허/논문)"]
+            default=["시세 데이터", "군집분석", "외부(통계/특허/논문)"],
+            key="sources"
         )
     with opt3:
-        depth = st.slider("근거 강도(모의)", 1, 5, 3)
+        depth = st.slider("근거 강도(모의)", 1, 5, 3, key="depth")
 
-    c1, c2, c3 = st.columns([1, 1, 5])
-    run = c1.button("🔎 분석 실행")
-    clear = c2.button("🧹 초기화")
+    # ── 실행/초기화 ──
+    def clear_query():
+        st.session_state["user_query"] = ""
+        st.rerun()
 
-    if clear:
-        st.session_state.user_query = ""
-        st.experimental_rerun()
+    c1, c2, _ = st.columns([1, 1, 5])
+    run = c1.button("🔎 분석 실행", key="run_btn")
+    c2.button("🧹 초기화", key="clear_btn", on_click=clear_query)
 
-    # --- 결과 패널(모의 응답 생성기) ---
-    if run and st.session_state.user_query.strip():
+    # ── 결과 패널(모의) ──
+    query = st.session_state.get("user_query", "")
+    if run and query.strip():
         import hashlib, random
-        seed = int(hashlib.md5(st.session_state.user_query.encode("utf-8")).hexdigest(), 16) % (2**32 - 1)
+        seed = int(hashlib.md5(query.encode("utf-8")).hexdigest(), 16) % (2**32 - 1)
         rng = random.Random(seed)
 
         market = rng.randint(60, 92)
@@ -149,9 +94,7 @@ def render_ai_secretary():
         option = rng.choice(["단계적 도입", "시범사업 후 의무화", "보조금+규제 병행"])
 
         st.subheader("🧾 정책 제안서(프로토타입)")
-        st.markdown(
-            f"**정책의 근거자료로서**, 아래와 같이 판단합니다. *(내부 신뢰도 추정치: {conf}%)*"
-        )
+        st.markdown(f"**정책의 근거자료로서**, 아래와 같이 판단합니다. *(내부 신뢰도 추정치: {conf}%)*")
 
         st.markdown("### 🧩 핵심 결론")
         st.write(f"- 제안: **{option}**")
@@ -181,4 +124,6 @@ def render_ai_secretary():
     else:
         st.info("왼쪽의 **빠른 질문 버튼**을 누르거나 텍스트를 작성한 뒤 **분석 실행**을 클릭하세요.")
 
+
+# 함수 호출
 render_ai_secretary()
