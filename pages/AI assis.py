@@ -62,36 +62,33 @@ def render_ai_secretary():
     st.caption("프로토타입: 버튼 중심 상호작용 · 실제 웹연동/모델 분석은 미구현")
 
     # --- 빠른 질문(버튼만으로 입력 채우기) ---
-    st.text_area(
-    "궁금한 점을 적어주세요",
+    st.text_area("궁금한 점을 적어주세요",
     key="user_query",
     value=st.session_state.get("user_query", ""),
-    placeholder="예) 전기차 배터리 재활용 의무비율을 어떻게 설정해야 하나요?"
-)
-st.markdown("**빠른 질문**")
+    placeholder="예) 전기차 배터리 재활용 의무비율을 어떻게 설정해야 하나요?")
+    st.markdown("**빠른 질문**")
 
-def set_query(q: str):
-    st.session_state["user_query"] = q
-    st.rerun()
+    def set_query(q: str):
+        st.session_state["user_query"] = q
+        st.rerun()
 
-qcols = st.columns(6)
-quicks = [
-    "배터리 재활용 의무비율 몇 %가 적절할까?",
-    "전기차 보조금 구조 개편 방향은?",
-    "ESS 안전기준 강화의 비용·효과는?",
-    "배터리 국산화율 제고 방안은?",
-    "탄소국경조정제도 대응 전략은?",
-    "중고 배터리 거래 투명성 제고?"
-]
-for i, q in enumerate(quicks):
-    qcols[i % 6].button(f"#{i+1}", on_click=set_query, args=(q,))
-def clear_query():
-    st.session_state["user_query"] = ""
-    st.rerun()
+    qcols = st.columns(6)
+    quicks = [
+        "배터리 재활용 의무비율 몇 %가 적절할까?",
+        "전기차 보조금 구조 개편 방향은?",
+        "ESS 안전기준 강화의 비용·효과는?",
+        "배터리 국산화율 제고 방안은?",
+        "탄소국경조정제도 대응 전략은?",
+        "중고 배터리 거래 투명성 제고?" ]
+    for i, q in enumerate(quicks):
+        qcols[i % 6].button(f"#{i+1}", on_click=set_query, args=(q,))
+    def clear_query():
+        st.session_state["user_query"] = ""
+        st.rerun()
 
-c1, c2, c3 = st.columns([1, 1, 5])
-run = c1.button("🔎 분석 실행")
-c2.button("🧹 초기화", on_click=clear_query)
+    c1, c2, c3 = st.columns([1, 1, 5])
+    run = c1.button("🔎 분석 실행")
+    c2.button("🧹 초기화", on_click=clear_query)
 
     st.markdown("**빠른 질문**")
     qcols = st.columns(6)
