@@ -12,7 +12,7 @@ st.markdown("""
   section[data-testid="stSidebar"]{background:#0f1b2d; color:#d7e1f2;}
   section[data-testid="stSidebar"] * {font-weight:500;}
 
-  /* page_link / 링크 버튼 공통 */
+  /* 공통 링크(page_link) */
   section[data-testid="stSidebar"] a[href]{
     color:#EAF2FF !important; opacity:1 !important;
     display:block; padding:10px 12px; border-radius:10px; font-weight:700; text-decoration:none;
@@ -23,24 +23,47 @@ st.markdown("""
   section[data-testid="stSidebar"] a[aria-current="page"]{
     background:#1c2e4a !important; color:#ffffff !important; box-shadow: inset 0 0 0 1px #273b5c;
   }
-  /* page_link 내부 글자색 고정 */
+  /* page_link 내부 텍스트 색 고정 */
   section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
   section[data-testid="stSidebar"] [data-testid^="stPageLink"] span { color:#EAF2FF !important; opacity:1 !important; }
   section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span { color:#FFFFFF !important; }
 
-  /* 사이드바 Expander(분석 결과 확인) 스타일 */
+  /* ── 여기부터 expander(분석 결과 확인) '첫번째 스샷'처럼 보이도록 수정 ── */
+  /* 이전에 주입된 커스텀 details 스타일이 있더라도 덮어쓰기 */
   section[data-testid="stSidebar"] details{
-    border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; margin:6px 0 12px;
-    background:rgba(255,255,255,.04);
+    background: transparent !important;
+    border: none !important;
+    margin: 6px 0 12px !important;
+    padding: 0 !important;
+    border-radius: 12px !important;
   }
+  /* expander 헤더를 밝은 pill로 */
   section[data-testid="stSidebar"] details > summary{
-    list-style:none; cursor:pointer; padding:10px 12px; color:#EAF2FF; background:rgba(255,255,255,.10);
+    list-style:none;
+    cursor:pointer;
+    padding:10px 12px !important;
+    border-radius:12px !important;
+    background:#ffffff !important;
+    color:#0f172a !important;
+    border:1px solid rgba(255,255,255,.22) !important;
   }
-  section[data-testid="stSidebar"] details[open] > summary{ background:rgba(255,255,255,.16); }
-  section[data-testid="stSidebar"] details a[href]{ margin:4px 6px; }
+  /* 펼쳤을 때도 헤더는 흰색 유지 */
+  section[data-testid="stSidebar"] details[open] > summary{
+    background:#ffffff !important;
+  }
+  /* expander 본문(링크 묶음)은 배경/테두리 제거 & 여백 최소화 */
+  section[data-testid="stSidebar"] details div[role="group"]{
+    padding: 6px 0 0 0 !important;
+    background: transparent !important;
+    border: none !important;
+    margin: 0 !important;
+  }
+  /* 본문 내부 링크는 여백 없이 촘촘하게(첫번째 스샷처럼) */
+  section[data-testid="stSidebar"] details a[href]{
+    margin: 0 !important;
+  }
 </style>
 """, unsafe_allow_html=True)
-
 
 def render_ai_secretary():
     st.title("🤖 AI 정책지원비서")
