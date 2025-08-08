@@ -593,7 +593,7 @@ with st.sidebar:
         st.page_link(pg_ts,     label="시세 분석", icon="📈")
 
     # 3) 이상거래 의심 — 그룹 밖에 단독 배치
-    st.page_link(pg_, label="이상거래 의심", icon="🌳")
+    st.page_link(pg_fraud, label="이상거래 의심", icon="🌳")
     st.page_link(pg_ocr,   label="OCR", icon="📄")
     st.page_link(pg_ai_assis, label="AI 정책지원비서", icon="🤖")
 
