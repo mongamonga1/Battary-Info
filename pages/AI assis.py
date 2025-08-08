@@ -1,22 +1,43 @@
 # pages/AI assis.py
 import streamlit as st
 
-# (선택) 홈과 동일한 스타일 유지
+# ── 다른 페이지와 동일한 사이드바/배경 테마 (이 파일에서만 주입)
 st.markdown("""
 <style>
-  [data-testid="stAppViewContainer"] { background: #f6f8fb; }
-  [data-testid="stHeader"] { background: rgba(246,248,251,0.7); backdrop-filter: blur(6px); }
-  [data-testid="stSidebar"] { background: #0f1b2d; color: #d7e1f2; }
-  [data-testid="stSidebar"] * { font-weight: 500; }
-  [data-testid="stSidebar"] a[href]{ color:#EAF2FF !important; opacity:1 !important;
-    display:block; padding:10px 12px; border-radius:10px; font-weight:700; }
-  [data-testid="stSidebar"] a[href]:hover{ background:#13233b !important; color:#ffffff !important; }
-  [data-testid="stSidebar"] a[aria-current="page"]{ background:#1c2e4a !important; color:#ffffff !important;
-    box-shadow: inset 0 0 0 1px #273b5c; }
+  /* 배경/헤더 */
+  [data-testid="stAppViewContainer"]{background:#f6f8fb;}
+  [data-testid="stHeader"]{background:rgba(246,248,251,.7); backdrop-filter:blur(6px);}
+
+  /* 사이드바 다크 */
+  section[data-testid="stSidebar"]{background:#0f1b2d; color:#d7e1f2;}
+  section[data-testid="stSidebar"] * {font-weight:500;}
+
+  /* page_link / 링크 버튼 공통 */
+  section[data-testid="stSidebar"] a[href]{
+    color:#EAF2FF !important; opacity:1 !important;
+    display:block; padding:10px 12px; border-radius:10px; font-weight:700; text-decoration:none;
+  }
+  section[data-testid="stSidebar"] a[href]:hover{
+    background:#13233b !important; color:#ffffff !important;
+  }
+  section[data-testid="stSidebar"] a[aria-current="page"]{
+    background:#1c2e4a !important; color:#ffffff !important; box-shadow: inset 0 0 0 1px #273b5c;
+  }
+  /* page_link 내부 글자색 고정 */
   section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
   section[data-testid="stSidebar"] [data-testid^="stPageLink"] span { color:#EAF2FF !important; opacity:1 !important; }
-  section[data-testid="stSidebar"]
-  [data-testid="stBaseButton-secondary"][aria-current="page"] span { color:#FFFFFF !important; }
+  section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span { color:#FFFFFF !important; }
+
+  /* 사이드바 Expander(분석 결과 확인) 스타일 */
+  section[data-testid="stSidebar"] details{
+    border:1px solid rgba(255,255,255,.08); border-radius:12px; overflow:hidden; margin:6px 0 12px;
+    background:rgba(255,255,255,.04);
+  }
+  section[data-testid="stSidebar"] details > summary{
+    list-style:none; cursor:pointer; padding:10px 12px; color:#EAF2FF; background:rgba(255,255,255,.10);
+  }
+  section[data-testid="stSidebar"] details[open] > summary{ background:rgba(255,255,255,.16); }
+  section[data-testid="stSidebar"] details a[href]{ margin:4px 6px; }
 </style>
 """, unsafe_allow_html=True)
 
