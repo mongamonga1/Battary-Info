@@ -4,63 +4,41 @@ import streamlit as st
 # ── 다른 페이지와 동일한 사이드바/배경 테마 (이 파일에서만 주입)
 st.markdown("""
 <style>
-  /* 배경/헤더 */
-  [data-testid="stAppViewContainer"]{background:#f6f8fb;}
-  [data-testid="stHeader"]{background:rgba(246,248,251,.7); backdrop-filter:blur(6px);}
-
-  /* 사이드바 다크 */
-  section[data-testid="stSidebar"]{background:#0f1b2d; color:#d7e1f2;}
-  section[data-testid="stSidebar"] * {font-weight:500;}
-
-  /* 공통 링크(page_link) */
+  /* === page_link 아이콘+텍스트 한 줄 고정 & 간격 축소 === */
+  /* 모든 page_link(a[href])를 flex row로 강제하고 줄바꿈 방지 */
   section[data-testid="stSidebar"] a[href]{
-    color:#EAF2FF !important; opacity:1 !important;
-    display:block; padding:10px 12px; border-radius:10px; font-weight:700; text-decoration:none;
+    display:flex !important;
+    flex-direction:row !important;
+    align-items:center !important;
+    gap:8px !important;                /* 아이콘-텍스트 간격 */
+    white-space:nowrap !important;      /* 줄바꿈 금지 */
+    line-height:1.15 !important;        /* 세로 높이 줄이기 */
+    padding:8px 10px !important;        /* 기본 10→8로 축소 */
+    margin:2px 6px !important;          /* 링크 사이 간격 축소 */
   }
-  section[data-testid="stSidebar"] a[href]:hover{
-    background:#13233b !important; color:#ffffff !important;
+  /* 내부 텍스트 span도 줄바꿈 금지 */
+  section[data-testid="stSidebar"] a[href] span{
+    white-space:nowrap !important;
   }
+  /* 선택된 항목(현재 페이지)도 동일 높이 유지 */
   section[data-testid="stSidebar"] a[aria-current="page"]{
-    background:#1c2e4a !important; color:#ffffff !important; box-shadow: inset 0 0 0 1px #273b5c;
+    padding:8px 10px !important;
+    margin:2px 6px !important;
   }
-  /* page_link 내부 텍스트 색 고정 */
-  section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] span,
-  section[data-testid="stSidebar"] [data-testid^="stPageLink"] span { color:#EAF2FF !important; opacity:1 !important; }
-  section[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"][aria-current="page"] span { color:#FFFFFF !important; }
 
-  /* ── 여기부터 expander(분석 결과 확인) '첫번째 스샷'처럼 보이도록 수정 ── */
-  /* 이전에 주입된 커스텀 details 스타일이 있더라도 덮어쓰기 */
-  section[data-testid="stSidebar"] details{
-    background: transparent !important;
-    border: none !important;
-    margin: 6px 0 12px !important;
-    padding: 0 !important;
-    border-radius: 12px !important;
+  /* === Expander(분석 결과 확인) 안쪽 링크 간격도 동일하게 === */
+  section[data-testid="stSidebar"] details[open] > div[role="group"]{
+    padding:8px 4px 6px 4px !important;  /* 박스 안쪽 여백 살짝만 */
   }
-  /* expander 헤더를 밝은 pill로 */
-  section[data-testid="stSidebar"] details > summary{
-    list-style:none;
-    cursor:pointer;
-    padding:10px 12px !important;
-    border-radius:12px !important;
-    background:#ffffff !important;
-    color:#0f172a !important;
-    border:1px solid rgba(255,255,255,.22) !important;
+  section[data-testid="stSidebar"] details[open] > div[role="group"] a[href]{
+    margin:2px 6px !important;
+    padding:8px 10px !important;
   }
-  /* 펼쳤을 때도 헤더는 흰색 유지 */
-  section[data-testid="stSidebar"] details[open] > summary{
-    background:#ffffff !important;
-  }
-  /* expander 본문(링크 묶음)은 배경/테두리 제거 & 여백 최소화 */
-  section[data-testid="stSidebar"] details div[role="group"]{
-    padding: 6px 0 0 0 !important;
-    background: transparent !important;
-    border: none !important;
-    margin: 0 !important;
-  }
-  /* 본문 내부 링크는 여백 없이 촘촘하게(첫번째 스샷처럼) */
-  section[data-testid="stSidebar"] details a[href]{
-    margin: 0 !important;
+
+  /* 아이콘 이모지의 수직 정렬 깔끔하게 */
+  section[data-testid="stSidebar"] a[href] svg,
+  section[data-testid="stSidebar"] a[href] img {
+    vertical-align:middle !important;
   }
 </style>
 """, unsafe_allow_html=True)
