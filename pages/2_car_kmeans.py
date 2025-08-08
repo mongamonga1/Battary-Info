@@ -3,7 +3,7 @@
 import warnings
 warnings.filterwarnings("ignore")
 
-import os, base64
+import os, base64, hashlib
 from io import BytesIO
 from pathlib import Path
 from math import pi
@@ -44,48 +44,25 @@ apply_colors(
 )
 st.markdown("""
 <style>
-/* (1) 드롭존 박스 */
 section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"]{
-  background-color:#1E293B !important;
-  border:1.5px dashed #94A3B8 !important;
-  border-radius:12px !important;
+  background-color:#1E293B !important; border:1.5px dashed #94A3B8 !important; border-radius:12px !important;
 }
-
-/* (2) 호환용(기존 클래스 경로) */
 section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"],
 section[data-testid="stSidebar"] .stFileUploader > div > div{
-  background-color:#1E293B !important;
-  border:1.5px dashed #94A3B8 !important;
-  border-radius:12px !important;
+  background-color:#1E293B !important; border:1.5px dashed #94A3B8 !important; border-radius:12px !important;
 }
-
-/* (3) 드롭존 내부 안내문 텍스트만 밝게 — '버튼'은 제외 */
 section[data-testid="stSidebar"] [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *),
 section[data-testid="stSidebar"] .stFileUploader [data-testid*="FileUploaderDropzone"] *:not(button):not([role="button"]):not(button *):not([role="button"] *){
-  color:#EAF2FF !important;
-  opacity:1 !important;
-  filter:none !important;
+  color:#EAF2FF !important; opacity:1 !important; filter:none !important;
 }
-
-/* (4) 업로더의 ‘Browse files’ 버튼(및 라벨)만 진하게 */
 section[data-testid="stSidebar"] [data-testid*="FileUploader"] button,
 section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"],
 section[data-testid="stSidebar"] [data-testid*="FileUploader"] button *,
 section[data-testid="stSidebar"] [data-testid*="FileUploader"] [role="button"] *{
-  background-color:#F1F5F9 !important;
-  color:#0F172A !important;
-  font-weight:700 !important;
-  opacity:1 !important;
+  background-color:#F1F5F9 !important; color:#0F172A !important; font-weight:700 !important; opacity:1 !important;
 }
-/* 사이드바 selectbox(입력창) 텍스트만 검정 */
-section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *{
-  color:#0F172A !important;
-}
-
-/* (옵션) 펼쳐진 옵션 목록 텍스트도 검정 */
-div[data-baseweb="popover"] [data-baseweb="menu"] *{
-  color:#0F172A !important;
-}
+section[data-testid="stSidebar"] [data-testid="stSelectbox"] [data-baseweb="select"] *{ color:#0F172A !important; }
+div[data-baseweb="popover"] [data-baseweb="menu"] *{ color:#0F172A !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -263,7 +240,7 @@ df = normalize_columns(df_raw)
 
 # 필수/수치 컬럼 확인
 if "Model" not in df.columns:
-    st.error("엑셀에 '차명/배터리종류/차종/모델' 중 하나가 없어 Model 컬럼을 만들 수 없습니다.")
+    st.error("엑셀에 '차명/배터리종류/차종/모델' 중 하나가 없어 Model 컬럼이 없습니다.")
     st.stop()
 
 num_pool = [c for c in ["Age","SoH","Price"] if c in df.columns]
@@ -271,7 +248,7 @@ if len(num_pool) < 2:
     st.error(f"수치 컬럼이 부족합니다(필요≥2). 현재: {num_pool}")
     st.stop()
 
-# ───────────────────────────── 사이드바 컨트롤(이 페이지 전용) ─────────────────────────────
+# ───────────────────────────── 사이드바 컨트롤 ─────────────────────────────
 models        = sorted(df["Model"].dropna().astype(str).unique())
 choice        = st.sidebar.selectbox("차명 선택", models)
 show_tsne     = st.sidebar.checkbox("t-SNE 2D 추가", value=True)
@@ -285,11 +262,11 @@ cost_saver   = st.sidebar.checkbox("비용 절감 모드(저가 모델·짧은 �
 DEFAULT_MODEL = "gpt-4o-mini"
 _api_key, _model_from_secret = get_openai_conf()
 MODEL_NAME   = _model_from_secret or DEFAULT_MODEL
-# ───────── GPT 요약 내부 설정(사이드바 노출 없음) ─────────
-cost_saver  = False          # 필요하면 True 로 바꿔 사용
-TEMPERATURE = 0.2            # 고정값
+# GPT 요약 내부 설정
+cost_saver  = False
+TEMPERATURE = 0.2
 MAX_TOKENS  = 320 if cost_saver else 600
-    
+
 # ───────────────────────────── 모델 데이터 준비 ─────────────────────────────
 sub_all = df[df["Model"].astype(str) == str(choice)].copy().dropna(subset=num_pool)
 n = len(sub_all)
@@ -309,47 +286,75 @@ preproc = ColumnTransformer(
 X = preproc.fit_transform(sub_all)
 if hasattr(X, "toarray"): X = X.toarray()
 
-# ───────────── k = Silhouette + Elbow + Dendrogram → 중앙값 ─────────────
-def choose_k_multi(X, ks):
-    votes = {}
-    try:
-        sil_scores = [silhouette_score(X, KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(X))
-                      for k in ks if k < len(X)]
-        if sil_scores: votes["silhouette"] = ks[int(np.argmax(sil_scores))]
-    except Exception:
-        pass
-    try:
-        if _has_yb:
-            viz = KElbowVisualizer(KMeans(random_state=42, n_init=10), k=ks, metric="distortion", timings=False)
-            viz.fit(X)
-            if viz.elbow_value_ is not None: votes["elbow"] = int(viz.elbow_value_)
-        else:
-            inertias = [KMeans(n_clusters=k, random_state=42, n_init=10).fit(X).inertia_ for k in ks]
-            if len(inertias) >= 2:
-                diffs = np.diff(inertias); idx = int(np.argmax(diffs))
-                votes["elbow"] = ks[idx+1] if idx+1 < len(ks) else ks[-1]
-    except Exception:
-        pass
-    try:
-        if _has_scipy:
+# ───────────────────────────── k 자동선정 (속도개선版) ─────────────────────────────
+@st.cache_data(show_spinner=False)
+def choose_k_multi_fast(X: np.ndarray, ks: tuple, sample_size: int = 1000, rnd: int = 42, use_scipy: bool = False):
+    """한 루프에서 inertia/labels를 얻어 Silhouette과 Elbow를 동시 계산. Silhouette은 표본샘플."""
+    sil_map, inertia_list = {}, []
+    rng = np.random.RandomState(rnd)
+
+    for k in ks:
+        if k >= len(X):
+            break
+        km = KMeans(n_clusters=k, random_state=rnd, n_init=10)
+        labels = km.fit_predict(X)
+        inertia_list.append((k, km.inertia_))
+        # 실루엣: 전체가 크면 표본샘플로
+        try:
+            s = silhouette_score(
+                X, labels,
+                sample_size=min(sample_size, len(X) - 1) if len(X) > 50 else None,
+                random_state=rnd
+            )
+            sil_map[k] = s
+        except Exception:
+            pass
+
+    # Silhouette 최댓값
+    k_sil = max(sil_map, key=sil_map.get) if sil_map else None
+
+    # Elbow: inertia 차분의 최대 변화점
+    k_vals, inert = zip(*inertia_list) if inertia_list else ([], [])
+    k_elb = None
+    if len(inert) >= 2:
+        diffs = np.diff(inert)
+        idx = int(np.argmax(diffs))
+        k_elb = k_vals[min(idx + 1, len(k_vals)-1)]
+
+    # Dendrogram(옵션, 표본 최대 200)
+    k_dend = None
+    if use_scipy:
+        try:
             m = X.shape[0]
             idx = np.arange(m if m <= 200 else 200)
             Z = linkage(X[idx], method="ward")
-            dists = Z[:,2]; gaps = np.diff(dists)
+            dists = Z[:, 2]
+            gaps = np.diff(dists)
             if len(gaps) >= 1:
-                k_est = m - (int(np.argmax(gaps))+1)
-                votes["dendrogram"] = max(2, min(k_est, ks[-1]))
-    except Exception:
-        pass
-    vals = [v for v in [votes.get("silhouette"), votes.get("elbow"), votes.get("dendrogram")] if v is not None]
-    return (int(np.median(vals)) if vals else 3), votes
+                k_est = m - (int(np.argmax(gaps)) + 1)
+                k_dend = max(2, min(k_est, ks[-1]))
+        except Exception:
+            pass
 
-k_final, votes = choose_k_multi(X, ks)
+    votes = {"silhouette": k_sil, "elbow": k_elb}
+    if k_dend is not None:
+        votes["dendrogram"] = k_dend
+
+    valid = [v for v in (k_sil, k_elb, k_dend) if v is not None]
+    k_final = int(np.median(valid)) if valid else 3
+    return k_final, votes
+
+k_final, votes = choose_k_multi_fast(X, tuple(ks), sample_size=1000, rnd=42, use_scipy=_has_scipy)
 st.caption(f"선택된 k = {k_final} (Sil={votes.get('silhouette','—')}, "
            f"Elbow={votes.get('elbow','—')}, Dend={votes.get('dendrogram','—')} → median)")
 
-# ───────────────────────────── 학습 & 라벨 ─────────────────────────────
-labels = KMeans(n_clusters=k_final, random_state=42, n_init=10).fit_predict(X)
+# ───────────────────────────── 최종 학습 & 라벨 (캐싱) ─────────────────────────────
+@st.cache_data(show_spinner=False)
+def fit_kmeans_labels(X: np.ndarray, k: int, rnd: int = 42):
+    km = KMeans(n_clusters=k, random_state=rnd, n_init=10)
+    return km.fit_predict(X)
+
+labels = fit_kmeans_labels(X, k_final, rnd=42)
 sub_all = sub_all.copy(); sub_all["cluster"] = labels
 clusters = sorted(sub_all["cluster"].unique())
 
@@ -357,7 +362,6 @@ clusters = sorted(sub_all["cluster"].unique())
 def fig_to_png(fig, dpi=160):
     buf = BytesIO(); fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight"); plt.close(fig)
     return buf.getvalue()
-
 def to_b64(png_bytes): return base64.b64encode(png_bytes).decode("utf-8")
 
 # ───────────────────────────── 공통 CSS(가로 스크롤) ─────────────────────────────
@@ -395,12 +399,26 @@ ax.set_xticks(angles[:-1]); ax.set_xticklabels(num_pool)
 plt.title(f"{choice}: Radar (k={k_final})"); plt.legend(loc="upper right", bbox_to_anchor=(1.25,1.05))
 main_images.append(("Radar", fig_to_png(fig)))
 
-# t-SNE 2D (옵션)
+# t-SNE 2D (캐싱 + 자동 다운샘플)
+@st.cache_data(show_spinner=False)
+def compute_tsne(X: np.ndarray, perplexity: int, rnd: int = 42, max_n: int = 2000):
+    # 큰 데이터는 다운샘플링해서 임베딩(시각화 용도) → 속도↑
+    if X.shape[0] > max_n:
+        idx = np.random.RandomState(rnd).choice(X.shape[0], max_n, replace=False)
+        X_use = X[idx]
+        idx_out = idx
+    else:
+        X_use = X
+        idx_out = None
+    ts2 = TSNE(n_components=2, perplexity=min(perplexity, X_use.shape[0]-1),
+               init="pca", max_iter=500, random_state=rnd).fit_transform(X_use)
+    return ts2, idx_out
+
 if show_tsne:
-    perp = min(perplexity, n-1)
-    ts2 = TSNE(n_components=2, perplexity=perp, max_iter=500, random_state=42, init="pca").fit_transform(X)
+    ts2, idx_out = compute_tsne(X, perplexity, rnd=42, max_n=2000)
+    lab_plot = labels if idx_out is None else labels[idx_out]
     fig = plt.figure(figsize=(5.2, 4.0))
-    plt.scatter(ts2[:,0], ts2[:,1], c=labels, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
+    plt.scatter(ts2[:,0], ts2[:,1], c=lab_plot, cmap="tab10", s=55, edgecolors="k", alpha=0.9)
     plt.title(f"{choice}: t-SNE 2D (k={k_final})"); plt.xlabel("t-SNE1"); plt.ylabel("t-SNE2"); plt.tight_layout()
     main_images.append(("t-SNE 2D", fig_to_png(fig)))
 
@@ -414,7 +432,7 @@ if show_pca3:
     main_images.append(("PCA 3D", fig_to_png(fig)))
 
 # 화면 출력(가로 스크롤)
-html_imgs = "".join([f"<img src='data:image/png;base64,{to_b64(p)}' height='320'/>" for _,p in main_images])
+html_imgs = "".join([f"<img src='data:image/png;base64,{base64.b64encode(p).decode('utf-8')}' height='320'/>" for _,p in main_images])
 st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_imgs}</div></div>", unsafe_allow_html=True)
 st.markdown("<div class='caption-center'>좌우 스크롤로 결과 그래프(PCA2D, Radar, 옵션: t-SNE/PCA3D)를 확인하세요.</div>", unsafe_allow_html=True)
 
@@ -444,7 +462,7 @@ if show_profiles:
     plt.title(f"{choice}: Numeric Feature Means per Cluster")
     profile_images.append(("Heatmap Means", fig_to_png(fig)))
 
-    html_prof = "".join([f"<img src='data:image/png;base64,{to_b64(p)}' height='300'/>" for _,p in profile_images])
+    html_prof = "".join([f"<img src='data:image/png;base64,{base64.b64encode(p).decode('utf-8')}' height='300'/>" for _,p in profile_images])
     st.markdown(f"<div class='scroll-x'><div class='scroll-row'>{html_prof}</div></div>", unsafe_allow_html=True)
     st.markdown("<div class='caption-center'>추가 프로파일도 가로 스크롤로 확인하세요.</div>", unsafe_allow_html=True)
 
