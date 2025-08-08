@@ -30,6 +30,7 @@ PAGES = {
     "kmeans": ROOT / "pages/2_car_kmeans.py",
     "reco": ROOT / "pages/4_recommend_system.py",
     "fraud": ROOT / "5_forest_lstm.py",
+    "ai_assis" : ROOT / "pages/AI assis.py",
     "timeseries": ROOT / "pages/5_timeseries_analysis.py",
     "ocr":    ROOT /"3_OCR.py", 
 }
@@ -561,11 +562,12 @@ home = st.Page(render_home, title="🏠 홈", default=True, url_path="")
 pg_kmeans = st.Page(str(PAGES["kmeans"]), title="🚗 차명별 군집분석", url_path="kmeans")
 pg_reco = st.Page(str(PAGES["reco"]), title="✨ 기업 추천", url_path="reco")
 pg_fraud = st.Page(str(PAGES["fraud"]), title="🌳 이상거래 의심", url_path="fraud")
+pg_ai_assis = st.Page(str(PAGES["ai_assis"]), title="🤖 AI 정책지원비서", url_path="ai_assis")
 pg_ts = st.Page(str(PAGES["timeseries"]), title="📈 시세 분석", url_path="timeseries")
 pg_ocr = st.Page(str(PAGES["ocr"]), title="📄 OCR 추출", url_path="ocr") 
 
 # 숨김 내비 생성
-current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ocr, pg_ts], position="hidden")
+current = st.navigation([home, pg_kmeans, pg_reco, pg_fraud, pg_ocr, pg_ai_assis , pg_ts], position="hidden")
 
 # ───────────────────── 사이드바(공통) ─────────────────────
 with st.sidebar:
@@ -591,8 +593,9 @@ with st.sidebar:
         st.page_link(pg_ts,     label="시세 분석", icon="📈")
 
     # 3) 이상거래 의심 — 그룹 밖에 단독 배치
-    st.page_link(pg_fraud, label="이상거래 의심", icon="🌳")
+    st.page_link(pg_, label="이상거래 의심", icon="🌳")
     st.page_link(pg_ocr,   label="OCR", icon="📄")
+    st.page_link(pg_ai_assis, label="AI 정책지원비서", icon="🤖")
 
 st.markdown(
     """
