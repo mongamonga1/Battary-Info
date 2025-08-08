@@ -23,7 +23,7 @@ st.markdown("""
 
 def render_ai_secretary():
     st.title("🤖 AI 정책지원비서")
-    st.caption("프로토타입: 버튼 중심 상호작용 · 실제 웹연동/모델 분석은 미구현")
+    st.caption("프로토타입: 실제 웹연동/LLM모델 분석은 미구현")
 
     # ── 질문 입력(한 번만 생성) ──
     st.text_area(
@@ -38,7 +38,6 @@ def render_ai_secretary():
 
     def set_query(q: str):
         st.session_state["user_query"] = q
-        st.rerun()
 
     qcols = st.columns(6)
     quicks = [
@@ -71,7 +70,6 @@ def render_ai_secretary():
     # ── 실행/초기화 ──
     def clear_query():
         st.session_state["user_query"] = ""
-        st.rerun()
 
     c1, c2, _ = st.columns([1, 1, 5])
     run = c1.button("🔎 분석 실행", key="run_btn")
