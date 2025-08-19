@@ -60,7 +60,7 @@ st.markdown("""
 
 def render_ai_secretary():
     st.title("🤖 AI 정책지원비서")
-    st.caption("프로토타입: 실제 웹연동/LLM모델 분석은 미구현")
+    st.caption("프로토타입: 실제기능 미구현")
 
     # ── 질문 입력(한 번만 생성) ──
     st.text_area(
@@ -155,7 +155,7 @@ def render_ai_secretary():
             st.write("2) 성과연동 보조금(효율·회수율 기준 차등)")
             st.write("3) 공공조달 가점 및 민관 표준 데이터셋 구축")
 
-        st.caption("※ 모든 수치/근거는 데모용 모의 값입니다. 실제 분석엔 내부/외부 데이터 파이프라인과 모델을 연결하세요.")
+        st.caption("※ 모든 수치/근거는 모의 값입니다. 실제 기능구현 X")
     else:
         st.info("왼쪽의 **빠른 질문 버튼**을 누르거나 텍스트를 작성한 뒤 **분석 실행**을 클릭하세요.")
 
