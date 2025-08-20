@@ -531,11 +531,11 @@ with col_a:
     gen_btn = st.button("🧠 분석결과 생성 & Word로 저장", use_container_width=True)
 with col_b:
     if st.session_state.ai_text:
-        st.markdown("**🔎 분석 결과 (GPT 생성)**")
+        st.markdown("**🔎 분석 결과 (믿:음 생성)**")
         st.write(st.session_state.ai_text)
 
 if gen_btn:
-    with st.spinner("GPT 분석결과 생성 및 Word 문서 작성 중..."):
+    with st.spinner("믿:음 분석결과 생성 및 Word 문서 작성 중..."):
         ai_text = generate_ai_summary(
             model=choice, k_final=k_final, votes=votes, dfm=sub_all,
             num_pool=num_pool, model_name=MODEL_NAME,
